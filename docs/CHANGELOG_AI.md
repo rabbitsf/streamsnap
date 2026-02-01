@@ -20,3 +20,18 @@
 | Video/audio downloading | `app/services/downloader.py` |
 | Authentication | `app/auth.py` |
 | Database models | `app/models.py` |
+
+---
+
+## 2026-02-01: Multi-Select Delete for History
+
+### Changes
+- Added checkboxes to history table for multi-select
+- Added "Delete Selected" button with item count
+- Added "Delete All" button to clear entire history
+- New routes: `POST /history/delete-bulk`, `POST /history/delete-all`
+- Both endpoints reuse canonical `delete_download()` from `app/services/downloader.py`
+
+### Files Modified
+- `app/routes/history.py` - added bulk delete endpoints
+- `app/templates/history.html` - added checkboxes, toolbar, and JavaScript

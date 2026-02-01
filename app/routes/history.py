@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import List
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -64,3 +65,50 @@ async def delete_history_item(
 
     # Return empty response to remove the row
     return ""
+
+
+@router.post("/history/delete-bulk", response_class=HTMLResponse)
+async def delete_bulk_history(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    ids: List[int] = Form(default=[]),
+):
+    """Delete multiple downloads from history (HTMX endpoint)."""
+    if not ids:
+        return ""
+
+    downloads = db.query(Download).filter(
+        Download.id.in_(ids),
+        Download.user_id == user.id,
+    ).all()
+
+    for download in downloads:
+        delete_download(download.file_path, user.id)
+        db.delete(download)
+
+    db.commit()
+
+    # Return HX-Refresh header to reload the page
+    return HTMLResponse(content="", headers={"HX-Refresh": "true"})
+
+
+@router.post("/history/delete-all", response_class=HTMLResponse)
+async def delete_all_history(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete all downloads from history (HTMX endpoint)."""
+    downloads = db.query(Download).filter(
+        Download.user_id == user.id,
+    ).all()
+
+    for download in downloads:
+        delete_download(download.file_path, user.id)
+        db.delete(download)
+
+    db.commit()
+
+    # Return HX-Refresh header to reload the page
+    return HTMLResponse(content="", headers={"HX-Refresh": "true"})

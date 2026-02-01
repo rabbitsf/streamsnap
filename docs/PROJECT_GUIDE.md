@@ -1,7 +1,7 @@
 # StreamSnap - AI-Optimized System Map
 
 > Living documentation for the StreamSnap project.
-> Last updated: 2026-02-01
+> Last updated: 2026-02-01 (added bulk delete routes)
 
 ## 1. Project Overview
 
@@ -81,8 +81,8 @@ FastAPI Backend (app/)
 #### Workflow C: History Management
 1. User visits `/history`
 2. All downloads queried, file existence checked
-3. User can re-download or delete entries
-4. DELETE request removes file and database record
+3. User can re-download or delete entries (single, bulk, or all)
+4. DELETE/POST request removes file(s) and database record(s)
 
 ### Skill Workflows (unchanged)
 
@@ -131,7 +131,7 @@ streamsnap/
 │   ├── routes/
 │   │   ├── auth.py          # /login, /register, /logout
 │   │   ├── download.py      # /, /fetch-formats, /download, /file/{id}
-│   │   └── history.py       # /history, DELETE /history/{id}
+│   │   └── history.py       # /history, bulk delete, delete-all
 │   ├── services/
 │   │   └── downloader.py    # yt-dlp wrapper (CANONICAL)
 │   ├── templates/
@@ -166,7 +166,9 @@ streamsnap/
 | `/download` | POST | Yes | Batch download multiple URLs (HTMX) |
 | `/file/{id}` | GET | Yes | Serve file to browser |
 | `/history` | GET | Yes | Download history page |
-| `/history/{id}` | DELETE | Yes | Remove download (HTMX) |
+| `/history/{id}` | DELETE | Yes | Remove single download (HTMX) |
+| `/history/delete-bulk` | POST | Yes | Remove multiple selected downloads (HTMX) |
+| `/history/delete-all` | POST | Yes | Remove all user downloads (HTMX) |
 
 ## 7. Database Schema
 

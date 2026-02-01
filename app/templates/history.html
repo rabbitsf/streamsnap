@@ -9,10 +9,44 @@
 </div>
 
 {% if downloads %}
+<div class="flex items-center gap-3 mb-4">
+    <form id="bulk-delete-form" hx-post="/history/delete-bulk" hx-swap="none">
+        <button
+            type="submit"
+            id="delete-selected-btn"
+            disabled
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Delete Selected (<span id="selected-count">0</span>)
+        </button>
+    </form>
+    <button
+        hx-post="/history/delete-all"
+        hx-confirm="Delete ALL downloads? This cannot be undone."
+        hx-swap="none"
+        class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+    >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+        </svg>
+        Delete All
+    </button>
+</div>
+
 <div class="bg-gray-800 rounded-lg overflow-hidden">
     <table class="w-full">
         <thead class="bg-gray-700">
             <tr>
+                <th class="px-4 py-3 text-left">
+                    <input
+                        type="checkbox"
+                        id="select-all"
+                        class="w-4 h-4 rounded border-gray-500 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                    >
+                </th>
                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Title</th>
                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Type</th>
                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Quality</th>
@@ -24,6 +58,15 @@
         <tbody class="divide-y divide-gray-700">
             {% for download in downloads %}
             <tr id="row-{{ download.id }}" class="hover:bg-gray-700/50">
+                <td class="px-4 py-3">
+                    <input
+                        type="checkbox"
+                        name="ids"
+                        value="{{ download.id }}"
+                        form="bulk-delete-form"
+                        class="row-checkbox w-4 h-4 rounded border-gray-500 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                    >
+                </td>
                 <td class="px-4 py-3">
                     <div class="max-w-xs truncate" title="{{ download.title }}">
                         {{ download.title or download.filename }}
@@ -107,4 +150,43 @@
     </a>
 </div>
 {% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('select-all');
+    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    const deleteBtn = document.getElementById('delete-selected-btn');
+    const selectedCount = document.getElementById('selected-count');
+    const bulkForm = document.getElementById('bulk-delete-form');
+
+    function updateState() {
+        const checked = document.querySelectorAll('.row-checkbox:checked');
+        const count = checked.length;
+        selectedCount.textContent = count;
+        deleteBtn.disabled = count === 0;
+        selectAll.checked = count === rowCheckboxes.length && count > 0;
+        selectAll.indeterminate = count > 0 && count < rowCheckboxes.length;
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            rowCheckboxes.forEach(cb => cb.checked = this.checked);
+            updateState();
+        });
+    }
+
+    rowCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateState);
+    });
+
+    if (bulkForm) {
+        bulkForm.addEventListener('htmx:confirm', function(e) {
+            const count = document.querySelectorAll('.row-checkbox:checked').length;
+            if (count > 0 && !confirm(`Delete ${count} selected item(s)?`)) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
