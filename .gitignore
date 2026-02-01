@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database
+*.db
+
+# Downloads (user-generated content)
+downloads/
+
+# Node
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
+
+# Compiled Tailwind (regenerated)
+app/static/css/output.css
+
+# Skill packages (generated artifacts)
+*.skill
+
+# Media files (samples/tests)
+*.mp4
+*.m4a
+*.mp3
+*.wav
+*.webm

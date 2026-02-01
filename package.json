@@ -1,0 +1,12 @@
+{
+  "name": "streamsnap",
+  "version": "1.0.0",
+  "description": "StreamSnap web application - Tailwind CSS build",
+  "scripts": {
+    "build:css": "tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css",
+    "watch:css": "tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

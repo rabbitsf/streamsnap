@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Download Videos - StreamSnap{% endblock %}
+
+{% block content %}
+<div class="text-center mb-8">
+    <h1 class="text-3xl font-bold mb-2">Download Videos</h1>
+    <p class="text-gray-400">Paste URLs from YouTube, Twitter, TikTok, and 1000+ other sites</p>
+</div>
+
+<div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+    <form
+        hx-post="/fetch-formats"
+        hx-target="#format-options"
+        hx-indicator="#loading"
+        class="space-y-4"
+    >
+        <div>
+            <label for="urls" class="block text-sm font-medium text-gray-300 mb-2">
+                Video URLs
+                <span class="text-gray-500 font-normal">(one per line, or comma-separated)</span>
+            </label>
+            <textarea
+                id="urls"
+                name="urls"
+                required
+                rows="4"
+                class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 text-white resize-y"
+                placeholder="https://www.youtube.com/watch?v=...
+https://twitter.com/user/status/...
+https://www.tiktok.com/@user/video/..."
+            ></textarea>
+        </div>
+        <button
+            type="submit"
+            class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+        >
+            Fetch Formats
+        </button>
+    </form>
+
+    <div id="loading" class="htmx-indicator text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <p class="mt-2 text-gray-400">Fetching video information...</p>
+    </div>
+
+    <div id="format-options" class="mt-6">
+        <!-- Format options will be loaded here via HTMX -->
+    </div>
+</div>
+
+<div class="mt-8 text-center text-gray-500 text-sm">
+    <p>Supported sites: YouTube, Twitter/X, TikTok, Instagram, Vimeo, Twitch, Reddit, and many more.</p>
+</div>
+{% endblock %}
