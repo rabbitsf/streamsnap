@@ -1,7 +1,7 @@
 # StreamSnap - AI-Optimized System Map
 
 > Living documentation for the StreamSnap project.
-> Last updated: 2026-02-01 (added bulk delete routes)
+> Last updated: 2026-02-12 (local file upload + audio extraction + rename feature)
 
 ## 1. Project Overview
 
@@ -12,6 +12,8 @@ This project contains two components:
 - Self-hosted web app for downloading videos from 1000+ sites
 - User authentication with session-based login
 - Video quality selection and audio extraction
+- Local file upload with drag-and-drop for audio extraction via FFmpeg
+- Rename support (individual + batch sequential) for downloads and uploads
 - Download history with re-download capability
 
 #### B. Claude Code Skills (existing)
@@ -48,7 +50,7 @@ FastAPI Backend (app/)
 ```
 
 ### Canonical source layer (where permanent changes must be made)
-- `app/services/downloader.py` - ALL video/audio download logic (web app)
+- `app/services/downloader.py` - ALL video/audio download logic + local file extraction + rename (web app)
 - `app/auth.py` - ALL authentication logic (web app)
 - `~/.claude/skills/video-downloader/SKILL.md` - Video downloader skill
 - `~/.claude/skills/audio-extractor/SKILL.md` - Audio extractor skill
@@ -68,15 +70,27 @@ FastAPI Backend (app/)
 3. JWT token stored in HTTP-only cookie
 4. User redirected to main page
 
-#### Workflow B: Video Download (supports multiple URLs)
+#### Workflow B: Video Download (supports multiple URLs + rename)
 1. User pastes one or more URLs (newline or comma-separated)
 2. HTMX POST to `/fetch-formats` → `downloader.fetch_multiple_video_info()`
-3. All video previews rendered; user selects quality/format
+3. All video previews rendered; user selects quality/format + rename option
 4. HTMX POST to `/download` → batch calls to `download_video()` or `extract_audio()`
-5. Videos saved to `downloads/{user_id}/videos/`
+5. If rename requested, `rename_download_file()` applied after download
+6. Videos saved to `downloads/{user_id}/videos/`
+7. Audios saved to `downloads/{user_id}/audios/`
+8. Download records saved to database
+9. Success partial rendered with individual download links
+
+#### Workflow B2: Local File Upload + Audio Extraction
+1. User switches to "Extract from Files" tab on landing page
+2. User drags-and-drops or browses for local video files
+3. HTMX POST to `/upload/files` → files saved to `downloads/{user_id}/uploads/`
+4. Upload options partial rendered with audio format + rename choices
+5. HTMX POST to `/upload/extract` → `extract_audio_from_file()` via FFmpeg
 6. Audios saved to `downloads/{user_id}/audios/`
-7. Download records saved to database
-8. Success partial rendered with individual download links
+7. Source files deleted from uploads dir after extraction
+8. Download records saved to database (url="local upload")
+9. Success partial rendered with download links
 
 #### Workflow C: History Management
 1. User visits `/history`
@@ -94,11 +108,11 @@ FastAPI Backend (app/)
 
 ## 4. Canonical Implementations (Single Source of Truth)
 
-### 4.1 Web App: Video/Audio Downloading
-- **User-facing behavior**: Download videos/audio via web interface
+### 4.1 Web App: Video/Audio Downloading & Local File Extraction
+- **User-facing behavior**: Download videos/audio via web interface; extract audio from local uploads
 - **Canonical implementation**: `app/services/downloader.py`
-- **All routes must use**: `fetch_video_info()`, `download_video()`, `extract_audio()`
-- **Never duplicate**: yt-dlp calls, format parsing, file path logic
+- **All routes must use**: `fetch_video_info()`, `download_video()`, `extract_audio()`, `extract_audio_from_file()`, `rename_download_file()`
+- **Never duplicate**: yt-dlp calls, FFmpeg calls, format parsing, file path logic, rename logic
 
 ### 4.2 Web App: Authentication
 - **User-facing behavior**: Login, register, logout
@@ -131,6 +145,7 @@ streamsnap/
 │   ├── routes/
 │   │   ├── auth.py          # /login, /register, /logout
 │   │   ├── download.py      # /, /fetch-formats, /download, /file/{id}
+│   │   ├── upload.py         # /upload/files, /upload/extract, /upload/cancel
 │   │   └── history.py       # /history, bulk delete, delete-all
 │   ├── services/
 │   │   └── downloader.py    # yt-dlp wrapper (CANONICAL)
@@ -141,14 +156,16 @@ streamsnap/
 │   │   ├── index.html       # Main download page
 │   │   ├── history.html
 │   │   └── partials/        # HTMX fragments
-│   │       ├── format_options.html
+│   │       ├── format_options.html    # URL download options + rename UI
+│   │       ├── upload_options.html    # File upload options + rename UI
 │   │       ├── download_complete.html
 │   │       └── error.html
 │   └── static/css/
 ├── downloads/               # User files organized by type:
 │   └── {user_id}/
 │       ├── videos/          # Downloaded videos (.mp4)
-│       └── audios/          # Extracted audio (.mp3, .m4a)
+│       ├── audios/          # Extracted audio (.mp3, .m4a, .wav)
+│       └── uploads/         # Temporary uploaded files (cleaned up after extraction)
 ├── requirements.txt         # Python dependencies
 ├── package.json             # Tailwind CLI
 └── tailwind.config.js
@@ -169,6 +186,9 @@ streamsnap/
 | `/history/{id}` | DELETE | Yes | Remove single download (HTMX) |
 | `/history/delete-bulk` | POST | Yes | Remove multiple selected downloads (HTMX) |
 | `/history/delete-all` | POST | Yes | Remove all user downloads (HTMX) |
+| `/upload/files` | POST | Yes | Upload local video files (HTMX, multipart) |
+| `/upload/extract` | POST | Yes | Extract audio from uploaded files (HTMX) |
+| `/upload/cancel` | POST | Yes | Clean up temp uploaded files (HTMX) |
 
 ## 7. Database Schema
 
@@ -216,16 +236,20 @@ streamstop   # Stop the server if running in background
 ## 9. Duplication Hotspots (AI Warnings)
 
 - **Download logic**: Never call yt-dlp directly from routes. Always use `app/services/downloader.py`.
+- **Local extraction**: Never call FFmpeg directly from routes. Always use `extract_audio_from_file()` from downloader.py.
+- **Rename logic**: Never rename files from routes. Always use `rename_download_file()` from downloader.py.
 - **Auth checks**: Never validate passwords or tokens outside `app/auth.py`.
-- **File paths**: Always use `get_user_download_dir(user_id, media_type)` from downloader.py. Pass `media_type="video"` or `media_type="audio"` to route files to the correct subfolder.
+- **File paths**: Always use `get_user_download_dir(user_id, media_type)` or `get_user_upload_dir(user_id)` from downloader.py.
+- **Playlist suppression**: All yt-dlp option dicts in `downloader.py` MUST include `'noplaylist': True`. Without this, URLs containing playlist parameters (e.g., `&list=...&index=...`) cause yt-dlp to process the entire playlist, hanging the app.
 - **Skill vs Web App**: The web app and skills are separate. Skills call yt-dlp via CLI; web app uses Python library.
 
 ## 10. Safe Change Playbook
 
 ### Modifying download behavior
 1. Edit `app/services/downloader.py` only
-2. Update affected templates if output format changes
-3. Test via web interface
+2. Ensure all three yt-dlp option dicts (`fetch_video_info`, `download_video`, `extract_audio`) stay consistent -- every shared option (e.g., `noplaylist`, `quiet`, `no_warnings`) must appear in all three
+3. Update affected templates if output format changes
+4. Test via web interface
 
 ### Adding new user features
 1. Add fields to `app/models.py`

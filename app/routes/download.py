@@ -15,6 +15,7 @@ from app.services.downloader import (
     download_video,
     extract_audio,
     get_user_base_dir,
+    rename_download_file,
 )
 
 router = APIRouter()
@@ -74,6 +75,9 @@ async def start_download(
     quality: str = Form("best"),
     format_id: Optional[str] = Form(None),
     audio_format: str = Form("mp3"),
+    rename_mode: str = Form("original"),
+    custom_names: Optional[list[str]] = Form(None),
+    batch_prefix: str = Form(""),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -87,10 +91,13 @@ async def start_download(
             {"request": request, "error": "No URLs provided"}
         )
 
+    # Parse custom names for individual rename mode
+    name_list = [n.strip() for n in (custom_names or []) if n.strip()]
+
     download_records = []
     errors = []
 
-    for url in url_list:
+    for idx, url in enumerate(url_list):
         try:
             if download_type == "audio":
                 result = extract_audio(
@@ -114,13 +121,32 @@ async def start_download(
                 errors.append({"url": url, "error": result.error or "Download failed"})
                 continue
 
+            # Apply rename if requested
+            final_path = result.file_path
+            final_filename = result.filename
+            final_title = result.title
+
+            if rename_mode == "individual" and idx < len(name_list) and name_list[idx]:
+                new_path = rename_download_file(result.file_path, name_list[idx], user.id)
+                if new_path:
+                    final_path = new_path
+                    final_filename = Path(new_path).name
+                    final_title = name_list[idx]
+            elif rename_mode == "batch" and batch_prefix:
+                new_name = f"{batch_prefix} {idx + 1:02d}"
+                new_path = rename_download_file(result.file_path, new_name, user.id)
+                if new_path:
+                    final_path = new_path
+                    final_filename = Path(new_path).name
+                    final_title = new_name
+
             # Save to history
             download_record = Download(
                 user_id=user.id,
                 url=url,
-                title=result.title,
-                filename=result.filename,
-                file_path=result.file_path,
+                title=final_title,
+                filename=final_filename,
+                file_path=final_path,
                 file_size=result.file_size,
                 format_type=format_type,
                 quality=quality_label,

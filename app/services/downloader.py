@@ -7,6 +7,7 @@ This is the single source of truth for yt-dlp operations.
 
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -95,6 +96,7 @@ def fetch_video_info(url: str) -> VideoInfo:
         'quiet': True,
         'no_warnings': True,
         'extract_flat': False,
+        'noplaylist': True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -201,6 +203,7 @@ def download_video(
         'outtmpl': str(user_dir / '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
+        'noplaylist': True,
         'merge_output_format': 'mp4',
     }
 
@@ -264,6 +267,7 @@ def extract_audio(
         'outtmpl': str(user_dir / '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
+        'noplaylist': True,
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': audio_format,
@@ -275,17 +279,19 @@ def extract_audio(
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-            # The filename will have the audio extension after post-processing
-            title = sanitize_filename(info.get('title', 'audio'))
-            filepath = user_dir / f"{title}.{audio_format}"
+            # Get the actual filepath from yt-dlp (reliable, like download_video)
+            if info.get('requested_downloads'):
+                filepath = Path(info['requested_downloads'][0]['filepath'])
+            else:
+                # Fallback: construct path and search
+                title = sanitize_filename(info.get('title', 'audio'))
+                filepath = user_dir / f"{title}.{audio_format}"
 
-            # yt-dlp might sanitize the title differently
-            if not filepath.exists():
-                # Try to find the file
-                for f in user_dir.iterdir():
-                    if f.suffix == f".{audio_format}" and f.stem.startswith(title[:20]):
-                        filepath = f
-                        break
+                if not filepath.exists():
+                    for f in user_dir.iterdir():
+                        if f.suffix == f".{audio_format}" and f.stem.startswith(title[:20]):
+                            filepath = f
+                            break
 
             file_size = filepath.stat().st_size if filepath.exists() else None
 
@@ -332,6 +338,170 @@ def delete_download(file_path: str, user_id: int) -> bool:
         os.remove(path)
         return True
     return False
+
+
+def get_user_upload_dir(user_id: int) -> Path:
+    """Get or create the upload directory for temporary file uploads."""
+    upload_dir = DOWNLOADS_DIR / str(user_id) / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    return upload_dir
+
+
+def extract_audio_from_file(
+    source_path: str,
+    user_id: int,
+    audio_format: str = "mp3",
+    audio_quality: str = "192",
+    output_filename: Optional[str] = None,
+) -> DownloadResult:
+    """
+    Extract audio from a local video file using FFmpeg directly.
+
+    This is the canonical method for local file audio extraction.
+    Uses subprocess (not yt-dlp) since files are already local.
+
+    Args:
+        source_path: Path to the source video file
+        user_id: The user's ID (for directory isolation)
+        audio_format: Output format ("mp3", "m4a", "wav")
+        audio_quality: Bitrate in kbps ("128", "192", "320")
+        output_filename: Custom output name (without extension); uses source stem if None
+    """
+    allowed_formats = {"mp3", "m4a", "wav"}
+    if audio_format not in allowed_formats:
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error=f"Unsupported format: {audio_format}",
+        )
+
+    source = Path(source_path)
+    if not source.exists():
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error="Source file not found",
+        )
+
+    # Security: verify source is in user's directory
+    user_base = get_user_base_dir(user_id)
+    try:
+        source.resolve().relative_to(user_base.resolve())
+    except ValueError:
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error="Access denied",
+        )
+
+    output_dir = get_user_download_dir(user_id, media_type="audio")
+
+    # Determine output filename
+    if output_filename:
+        stem = sanitize_filename(output_filename)
+    else:
+        # Strip uuid prefix if present (format: {uuid}_{original})
+        original_stem = source.stem
+        parts = original_stem.split("_", 1)
+        if len(parts) == 2 and len(parts[0]) == 32:
+            stem = sanitize_filename(parts[1])
+        else:
+            stem = sanitize_filename(original_stem)
+
+    output_path = output_dir / f"{stem}.{audio_format}"
+
+    # Handle collision
+    counter = 1
+    while output_path.exists():
+        output_path = output_dir / f"{stem}_{counter}.{audio_format}"
+        counter += 1
+
+    # Codec mapping
+    codec_map = {"mp3": "libmp3lame", "m4a": "aac", "wav": "pcm_s16le"}
+    codec = codec_map.get(audio_format, "libmp3lame")
+
+    cmd = [
+        "ffmpeg", "-i", str(source), "-vn",
+        "-acodec", codec, "-b:a", f"{audio_quality}k",
+        "-y", str(output_path),
+    ]
+    # wav doesn't use bitrate
+    if audio_format == "wav":
+        cmd = [
+            "ffmpeg", "-i", str(source), "-vn",
+            "-acodec", codec, "-y", str(output_path),
+        ]
+
+    try:
+        subprocess.run(
+            cmd, capture_output=True, text=True, timeout=300, check=True,
+        )
+    except subprocess.TimeoutExpired:
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error="Audio extraction timed out (5 min limit)",
+        )
+    except subprocess.CalledProcessError as e:
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error=f"FFmpeg error: {e.stderr[:200]}",
+        )
+
+    file_size = output_path.stat().st_size if output_path.exists() else None
+
+    return DownloadResult(
+        success=True,
+        file_path=str(output_path),
+        filename=output_path.name,
+        title=stem,
+        file_size=file_size,
+        error=None,
+    )
+
+
+def rename_download_file(
+    current_path: str,
+    new_filename: str,
+    user_id: int,
+) -> Optional[str]:
+    """
+    Rename a downloaded file, preserving its extension.
+
+    Args:
+        current_path: Current absolute path to the file
+        new_filename: New filename (without extension)
+        user_id: The user's ID (for security check)
+
+    Returns:
+        New absolute path string, or None if rename failed
+    """
+    path = Path(current_path)
+    user_base = get_user_base_dir(user_id)
+
+    # Security: verify current path is within user's directory
+    try:
+        path.resolve().relative_to(user_base.resolve())
+    except ValueError:
+        return None
+
+    if not path.exists():
+        return None
+
+    ext = path.suffix
+    sanitized = sanitize_filename(new_filename)
+    new_path = path.parent / f"{sanitized}{ext}"
+
+    # Handle collision
+    counter = 1
+    while new_path.exists() and new_path != path:
+        new_path = path.parent / f"{sanitized}_{counter}{ext}"
+        counter += 1
+
+    # Security: verify new path stays within user's directory
+    try:
+        new_path.resolve().relative_to(user_base.resolve())
+    except ValueError:
+        return None
+
+    path.rename(new_path)
+    return str(new_path)
 
 
 def fetch_multiple_video_info(urls: list[str]) -> list[dict]:

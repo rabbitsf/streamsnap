@@ -1,0 +1,155 @@
+{% if upload_errors %}
+<div class="bg-yellow-900/30 border border-yellow-500 rounded-lg p-3 mb-4">
+    <p class="text-yellow-300 text-sm font-medium mb-1">Some files were skipped:</p>
+    {% for err in upload_errors %}
+    <p class="text-yellow-400/80 text-sm">{{ err }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if uploaded_files %}
+<div class="border-t border-gray-700 pt-6">
+    <h3 class="font-semibold text-lg mb-4">{{ uploaded_files|length }} file(s) uploaded</h3>
+
+    <!-- File list -->
+    <div class="space-y-2 mb-6">
+        {% for file in uploaded_files %}
+        <div class="flex justify-between text-sm px-3 py-2 bg-gray-700/50 rounded">
+            <span class="truncate text-gray-300">{{ file.original_name }}</span>
+            <span class="text-gray-500 flex-shrink-0 ml-2">{{ (file.size / 1024 / 1024) | round(1) }} MB</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form
+        hx-post="/upload/extract"
+        hx-target="#upload-options"
+        hx-indicator="#extract-loading"
+        class="space-y-4"
+    >
+        <!-- Hidden temp paths -->
+        {% for file in uploaded_files %}
+        <input type="hidden" name="temp_paths" value="{{ file.temp_path }}">
+        {% endfor %}
+
+        <!-- Audio Format Selection -->
+        <div>
+            <h4 class="font-medium text-gray-300 mb-3">Audio Format</h4>
+            <div class="flex gap-4">
+                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="audio_format" value="mp3" checked class="text-blue-500">
+                    <span>MP3 (192kbps)</span>
+                </label>
+                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="audio_format" value="m4a" class="text-blue-500">
+                    <span>M4A (AAC)</span>
+                </label>
+                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="audio_format" value="wav" class="text-blue-500">
+                    <span>WAV (lossless)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Rename Options -->
+        <div>
+            <h4 class="font-medium text-gray-300 mb-3">Output Filenames</h4>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="rename_mode" value="original" checked class="text-blue-500" onchange="toggleUploadRenameUI()">
+                    <span>Keep original filenames</span>
+                </label>
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="rename_mode" value="individual" class="text-blue-500" onchange="toggleUploadRenameUI()">
+                    <span>Rename individually</span>
+                </label>
+                {% if uploaded_files|length > 1 %}
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="rename_mode" value="batch" class="text-blue-500" onchange="toggleUploadRenameUI()">
+                    <span>Sequential numbering</span>
+                </label>
+                {% endif %}
+            </div>
+
+            <!-- Individual rename inputs -->
+            <div id="upload-individual-names" class="hidden mt-3 space-y-2">
+                {% for file in uploaded_files %}
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500 text-sm w-6">{{ loop.index }}.</span>
+                    <input
+                        type="text"
+                        name="custom_names"
+                        value="{{ file.stem }}"
+                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                    >
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Batch prefix input -->
+            {% if uploaded_files|length > 1 %}
+            <div id="upload-batch-prefix" class="hidden mt-3">
+                <div class="flex items-center gap-3">
+                    <input
+                        type="text"
+                        name="batch_prefix"
+                        placeholder="Prefix (e.g. 'Track')"
+                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                        oninput="updateBatchPreview(this.value)"
+                    >
+                </div>
+                <div id="upload-batch-preview" class="mt-2 text-gray-500 text-xs space-y-1">
+                    {% for file in uploaded_files %}
+                    <p><span class="batch-preview-name">Track</span> {{ '%02d' % loop.index }}.mp3</p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <button
+            type="submit"
+            class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+        >
+            Extract Audio from {{ uploaded_files|length }} file(s)
+        </button>
+    </form>
+
+    <!-- Cancel button -->
+    <button
+        type="button"
+        hx-post="/upload/cancel"
+        hx-target="#upload-options"
+        hx-include="[name='temp_paths']"
+        class="w-full py-2 mt-2 text-gray-400 hover:text-gray-300 text-sm transition-colors"
+    >
+        Cancel and remove uploaded files
+    </button>
+
+    <div id="extract-loading" class="htmx-indicator text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+        <p class="mt-2 text-gray-400">Extracting audio... This may take a moment.</p>
+    </div>
+</div>
+
+<script>
+function toggleUploadRenameUI() {
+    const mode = document.querySelector('input[name="rename_mode"]:checked').value;
+    const individual = document.getElementById('upload-individual-names');
+    const batch = document.getElementById('upload-batch-prefix');
+
+    individual.classList.toggle('hidden', mode !== 'individual');
+    if (batch) batch.classList.toggle('hidden', mode !== 'batch');
+}
+
+function updateBatchPreview(prefix) {
+    document.querySelectorAll('.batch-preview-name').forEach(el => {
+        el.textContent = prefix || 'Track';
+    });
+}
+</script>
+{% else %}
+<div class="bg-red-900/30 border border-red-500 rounded-lg p-4">
+    <p class="text-red-300">No valid video files were uploaded.</p>
+</div>
+{% endif %}

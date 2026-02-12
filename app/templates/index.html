@@ -5,10 +5,29 @@
 {% block content %}
 <div class="text-center mb-8">
     <h1 class="text-3xl font-bold mb-2">Download Videos</h1>
-    <p class="text-gray-400">Paste URLs from YouTube, Twitter, TikTok, and 1000+ other sites</p>
+    <p class="text-gray-400">Paste URLs or upload local video files to download or extract audio</p>
 </div>
 
-<div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+<!-- Tab Navigation -->
+<div class="flex border-b border-gray-700 mb-0">
+    <button
+        id="tab-url"
+        onclick="switchTab('url')"
+        class="px-6 py-3 font-medium text-sm border-b-2 border-blue-500 text-blue-400 transition-colors"
+    >
+        Download from URL
+    </button>
+    <button
+        id="tab-upload"
+        onclick="switchTab('upload')"
+        class="px-6 py-3 font-medium text-sm border-b-2 border-transparent text-gray-400 hover:text-gray-300 transition-colors"
+    >
+        Extract from Files
+    </button>
+</div>
+
+<!-- Tab 1: URL Download (existing functionality) -->
+<div id="panel-url" class="bg-gray-800 rounded-b-lg rounded-tr-lg p-6 shadow-lg">
     <form
         hx-post="/fetch-formats"
         hx-target="#format-options"
@@ -49,7 +68,251 @@ https://www.tiktok.com/@user/video/..."
     </div>
 </div>
 
+<!-- Tab 2: File Upload + Extract -->
+<div id="panel-upload" class="bg-gray-800 rounded-b-lg rounded-tr-lg p-6 shadow-lg hidden">
+    <form
+        id="upload-form"
+        hx-post="/upload/extract"
+        hx-target="#upload-result"
+        hx-indicator="#upload-loading"
+        hx-encoding="multipart/form-data"
+        class="space-y-4"
+    >
+        <!-- Drag and drop zone -->
+        <div
+            id="drop-zone"
+            class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center transition-colors cursor-pointer hover:border-gray-500"
+            onclick="document.getElementById('file-input').click()"
+        >
+            <svg class="w-12 h-12 mx-auto text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <p class="text-gray-300 font-medium mb-1">Drag & drop video files here</p>
+            <p class="text-gray-500 text-sm">or click to browse</p>
+            <p class="text-gray-600 text-xs mt-2">MP4, MKV, AVI, MOV, WebM, FLV, WMV (max 2 GB each)</p>
+        </div>
+
+        <input
+            type="file"
+            id="file-input"
+            name="files"
+            multiple
+            accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.wmv,.m4v,.mpg,.mpeg,.3gp,.ts"
+            class="hidden"
+        >
+
+        <!-- Selected files preview -->
+        <div id="file-list" class="hidden space-y-2">
+            <h4 class="text-sm font-medium text-gray-300">Selected files:</h4>
+            <div id="file-list-items" class="space-y-1"></div>
+        </div>
+
+        <!-- Extraction options (shown after files are selected) -->
+        <div id="extract-options" class="hidden space-y-4">
+            <!-- Audio Format -->
+            <div>
+                <h4 class="font-medium text-gray-300 mb-3">Audio Format</h4>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                        <input type="radio" name="audio_format" value="mp3" checked class="text-blue-500">
+                        <span>MP3 (192kbps)</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                        <input type="radio" name="audio_format" value="m4a" class="text-blue-500">
+                        <span>M4A (AAC)</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                        <input type="radio" name="audio_format" value="wav" class="text-blue-500">
+                        <span>WAV (lossless)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Rename Options -->
+            <div>
+                <h4 class="font-medium text-gray-300 mb-3">Output Filenames</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                        <input type="radio" name="rename_mode" value="original" checked class="text-blue-500" onchange="toggleUploadRenameUI()">
+                        <span>Keep original filenames</span>
+                    </label>
+                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                        <input type="radio" name="rename_mode" value="individual" class="text-blue-500" onchange="toggleUploadRenameUI()">
+                        <span>Rename individually</span>
+                    </label>
+                    <label id="batch-rename-option" class="hidden items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                        <input type="radio" name="rename_mode" value="batch" class="text-blue-500" onchange="toggleUploadRenameUI()">
+                        <span>Sequential numbering</span>
+                    </label>
+                </div>
+
+                <!-- Individual rename inputs (populated by JS) -->
+                <div id="upload-individual-names" class="hidden mt-3 space-y-2"></div>
+
+                <!-- Batch prefix input -->
+                <div id="upload-batch-prefix" class="hidden mt-3">
+                    <input
+                        type="text"
+                        name="batch_prefix"
+                        placeholder="Prefix (e.g. 'Track')"
+                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <button
+            type="submit"
+            id="upload-btn"
+            disabled
+            class="w-full px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+        >
+            Extract Audio
+        </button>
+    </form>
+
+    <div id="upload-loading" class="htmx-indicator text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+        <p class="mt-2 text-gray-400">Uploading and extracting audio... This may take a moment.</p>
+    </div>
+
+    <div id="upload-result" class="mt-6">
+        <!-- Results will be loaded here via HTMX -->
+    </div>
+</div>
+
 <div class="mt-8 text-center text-gray-500 text-sm">
     <p>Supported sites: YouTube, Twitter/X, TikTok, Instagram, Vimeo, Twitch, Reddit, and many more.</p>
 </div>
+
+<script>
+function switchTab(tab) {
+    const tabs = ['url', 'upload'];
+    tabs.forEach(t => {
+        const tabBtn = document.getElementById('tab-' + t);
+        const panel = document.getElementById('panel-' + t);
+        if (t === tab) {
+            tabBtn.classList.add('border-blue-500', 'text-blue-400');
+            tabBtn.classList.remove('border-transparent', 'text-gray-400');
+            panel.classList.remove('hidden');
+        } else {
+            tabBtn.classList.remove('border-blue-500', 'text-blue-400');
+            tabBtn.classList.add('border-transparent', 'text-gray-400');
+            panel.classList.add('hidden');
+        }
+    });
+}
+
+// File input change handler
+const fileInput = document.getElementById('file-input');
+const fileList = document.getElementById('file-list');
+const fileListItems = document.getElementById('file-list-items');
+const uploadBtn = document.getElementById('upload-btn');
+const extractOptions = document.getElementById('extract-options');
+
+fileInput.addEventListener('change', updateFileList);
+
+function updateFileList() {
+    const files = fileInput.files;
+    fileListItems.innerHTML = '';
+
+    if (files.length > 0) {
+        fileList.classList.remove('hidden');
+        extractOptions.classList.remove('hidden');
+        uploadBtn.disabled = false;
+
+        // Show batch option only for multiple files
+        const batchOption = document.getElementById('batch-rename-option');
+        if (files.length > 1) {
+            batchOption.classList.remove('hidden');
+            batchOption.classList.add('flex');
+        } else {
+            batchOption.classList.add('hidden');
+            batchOption.classList.remove('flex');
+            // Reset to original if batch was selected
+            const batchRadio = batchOption.querySelector('input');
+            if (batchRadio && batchRadio.checked) {
+                document.querySelector('#panel-upload input[name="rename_mode"][value="original"]').checked = true;
+                toggleUploadRenameUI();
+            }
+        }
+
+        // Build file list and individual rename inputs
+        const individualNames = document.getElementById('upload-individual-names');
+        individualNames.innerHTML = '';
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+
+            // File list item
+            const item = document.createElement('div');
+            item.className = 'flex justify-between text-sm px-3 py-2 bg-gray-700/50 rounded';
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'truncate text-gray-300';
+            nameSpan.textContent = file.name;
+            const sizeSpan = document.createElement('span');
+            sizeSpan.className = 'text-gray-500 flex-shrink-0 ml-2';
+            sizeSpan.textContent = sizeMB + ' MB';
+            item.appendChild(nameSpan);
+            item.appendChild(sizeSpan);
+            fileListItems.appendChild(item);
+
+            // Individual rename input
+            const stem = file.name.replace(/\.[^/.]+$/, '');
+            const renameDiv = document.createElement('div');
+            renameDiv.className = 'flex items-center gap-2';
+            const numSpan = document.createElement('span');
+            numSpan.className = 'text-gray-500 text-sm w-6';
+            numSpan.textContent = (i + 1) + '.';
+            renameDiv.appendChild(numSpan);
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'custom_names';
+            input.value = stem;
+            input.className = 'flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500';
+            renameDiv.appendChild(input);
+            individualNames.appendChild(renameDiv);
+        }
+    } else {
+        fileList.classList.add('hidden');
+        extractOptions.classList.add('hidden');
+        uploadBtn.disabled = true;
+    }
+}
+
+function toggleUploadRenameUI() {
+    const mode = document.querySelector('#panel-upload input[name="rename_mode"]:checked').value;
+    const individual = document.getElementById('upload-individual-names');
+    const batch = document.getElementById('upload-batch-prefix');
+
+    individual.classList.toggle('hidden', mode !== 'individual');
+    if (batch) batch.classList.toggle('hidden', mode !== 'batch');
+}
+
+// Drag and drop
+const dropZone = document.getElementById('drop-zone');
+
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('border-blue-500', 'bg-blue-500/5');
+});
+
+dropZone.addEventListener('dragleave', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border-blue-500', 'bg-blue-500/5');
+});
+
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border-blue-500', 'bg-blue-500/5');
+
+    const dt = new DataTransfer();
+    for (const file of e.dataTransfer.files) {
+        dt.items.add(file);
+    }
+    fileInput.files = dt.files;
+    updateFileList();
+});
+</script>
 {% endblock %}

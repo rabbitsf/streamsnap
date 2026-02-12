@@ -103,6 +103,60 @@
         <input type="hidden" name="quality" id="quality-input" value="best">
         <input type="hidden" name="audio_format" id="audio-format-input" value="mp3">
 
+        <!-- Rename Options -->
+        <div class="bg-gray-700/30 rounded-lg p-4">
+            <h4 class="font-medium mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Rename Output
+            </h4>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="rename_mode" value="original" checked class="text-blue-500" onchange="toggleRenameUI()">
+                    <span>Keep original filenames</span>
+                </label>
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="rename_mode" value="individual" class="text-blue-500" onchange="toggleRenameUI()">
+                    <span>Rename individually</span>
+                </label>
+                {% if valid_results|length > 1 %}
+                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
+                    <input type="radio" name="rename_mode" value="batch" class="text-blue-500" onchange="toggleRenameUI()">
+                    <span>Sequential numbering</span>
+                </label>
+                {% endif %}
+            </div>
+
+            <!-- Individual rename inputs (pre-filled with video titles) -->
+            <div id="dl-individual-names" class="hidden mt-3 space-y-2">
+                {% for item in valid_results %}
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500 text-sm w-6">{{ loop.index }}.</span>
+                    <input
+                        type="text"
+                        name="custom_names"
+                        class="dl-custom-name flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                        value="{{ item.info.title }}"
+                    >
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Batch prefix input -->
+            {% if valid_results|length > 1 %}
+            <div id="dl-batch-prefix" class="hidden mt-3">
+                <input
+                    type="text"
+                    name="batch_prefix"
+                    id="dl-batch-input"
+                    placeholder="Prefix (e.g. 'Episode')"
+                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                >
+            </div>
+            {% endif %}
+        </div>
+
         <button
             type="submit"
             class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
@@ -134,6 +188,16 @@
             }
         });
     });
+
+    // Rename UI toggle
+    function toggleRenameUI() {
+        const mode = document.querySelector('input[name="rename_mode"]:checked').value;
+        const individual = document.getElementById('dl-individual-names');
+        const batch = document.getElementById('dl-batch-prefix');
+
+        individual.classList.toggle('hidden', mode !== 'individual');
+        if (batch) batch.classList.toggle('hidden', mode !== 'batch');
+    }
     </script>
     {% else %}
     <p class="text-gray-400 text-center py-4">No valid videos to download. Please check the URLs and try again.</p>
