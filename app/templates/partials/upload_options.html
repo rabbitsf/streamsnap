@@ -1,22 +1,24 @@
 {% if upload_errors %}
-<div class="bg-yellow-900/30 border border-yellow-500 rounded-lg p-3 mb-4">
-    <p class="text-yellow-300 text-sm font-medium mb-1">Some files were skipped:</p>
+<div style="background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.3); padding:12px 14px; margin-bottom:16px; border-radius:2px;">
+    <p style="font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#FBBF24; margin-bottom:6px;">Some files were skipped</p>
     {% for err in upload_errors %}
-    <p class="text-yellow-400/80 text-sm">{{ err }}</p>
+    <p style="font-size:0.8rem; color:rgba(251,191,36,0.7); margin-top:3px;">{{ err }}</p>
     {% endfor %}
 </div>
 {% endif %}
 
 {% if uploaded_files %}
-<div class="border-t border-gray-700 pt-6">
-    <h3 class="font-semibold text-lg mb-4">{{ uploaded_files|length }} file(s) uploaded</h3>
+<div style="border-top:1px solid var(--border); padding-top:22px; margin-top:4px;" class="fade-up">
 
     <!-- File list -->
-    <div class="space-y-2 mb-6">
+    <p style="font-size:0.68rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px; font-family:'JetBrains Mono',monospace;">
+        {{ uploaded_files|length }} file(s) uploaded
+    </p>
+    <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:20px;">
         {% for file in uploaded_files %}
-        <div class="flex justify-between text-sm px-3 py-2 bg-gray-700/50 rounded">
-            <span class="truncate text-gray-300">{{ file.original_name }}</span>
-            <span class="text-gray-500 flex-shrink-0 ml-2">{{ (file.size / 1024 / 1024) | round(1) }} MB</span>
+        <div style="display:flex; justify-content:space-between; font-size:0.8125rem; padding:9px 12px; background:var(--surf-2); border:1px solid var(--border); border-radius:2px;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-dim);">{{ file.original_name }}</span>
+            <span style="color:var(--text-muted); flex-shrink:0; margin-left:12px; font-family:'JetBrains Mono',monospace; font-size:0.72rem;">{{ (file.size / 1024 / 1024) | round(1) }} MB</span>
         </div>
         {% endfor %}
     </div>
@@ -25,121 +27,120 @@
         hx-post="/upload/extract"
         hx-target="#upload-options"
         hx-indicator="#extract-loading"
-        class="space-y-4"
+        style="display:flex; flex-direction:column; gap:16px;"
     >
-        <!-- Hidden temp paths -->
+        <!-- Hidden paths -->
         {% for file in uploaded_files %}
         <input type="hidden" name="temp_paths" value="{{ file.temp_path }}">
         {% endfor %}
 
-        <!-- Audio Format Selection -->
-        <div>
-            <h4 class="font-medium text-gray-300 mb-3">Audio Format</h4>
-            <div class="flex gap-4">
-                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="audio_format" value="mp3" checked class="text-blue-500">
-                    <span>MP3 (192kbps)</span>
+        <!-- Audio format -->
+        <div style="background:var(--surf-2); border:1px solid var(--border); padding:16px; border-radius:2px;">
+            <p style="font-size:0.68rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px;">Audio Format</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <label style="display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--surf-3); border:1px solid var(--border-2); border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim);">
+                    <input type="radio" name="audio_format" value="mp3" checked>
+                    <span>MP3 <span style="color:var(--text-muted); font-size:0.72rem;">192kbps</span></span>
                 </label>
-                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="audio_format" value="m4a" class="text-blue-500">
-                    <span>M4A (AAC)</span>
+                <label style="display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--surf-3); border:1px solid var(--border-2); border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim);">
+                    <input type="radio" name="audio_format" value="m4a">
+                    <span>M4A <span style="color:var(--text-muted); font-size:0.72rem;">AAC</span></span>
                 </label>
-                <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="audio_format" value="wav" class="text-blue-500">
-                    <span>WAV (lossless)</span>
+                <label style="display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--surf-3); border:1px solid var(--border-2); border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim);">
+                    <input type="radio" name="audio_format" value="wav">
+                    <span>WAV <span style="color:var(--text-muted); font-size:0.72rem;">Lossless</span></span>
                 </label>
             </div>
         </div>
 
-        <!-- Rename Options -->
-        <div>
-            <h4 class="font-medium text-gray-300 mb-3">Output Filenames</h4>
-            <div class="space-y-2">
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="rename_mode" value="original" checked class="text-blue-500" onchange="toggleUploadRenameUI()">
+        <!-- Rename options -->
+        <div style="background:var(--surf-2); border:1px solid var(--border); padding:16px; border-radius:2px;">
+            <p style="font-size:0.68rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px;">Output Filenames</p>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="rename_mode" value="original" checked onchange="toggleUploadRenameUI()">
                     <span>Keep original filenames</span>
                 </label>
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="rename_mode" value="individual" class="text-blue-500" onchange="toggleUploadRenameUI()">
+                <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="rename_mode" value="individual" onchange="toggleUploadRenameUI()">
                     <span>Rename individually</span>
                 </label>
                 {% if uploaded_files|length > 1 %}
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="rename_mode" value="batch" class="text-blue-500" onchange="toggleUploadRenameUI()">
+                <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="rename_mode" value="batch" onchange="toggleUploadRenameUI()">
                     <span>Sequential numbering</span>
                 </label>
                 {% endif %}
             </div>
 
             <!-- Individual rename inputs -->
-            <div id="upload-individual-names" class="hidden mt-3 space-y-2">
+            <div id="upload-individual-names" style="display:none; margin-top:10px; flex-direction:column; gap:6px;">
                 {% for file in uploaded_files %}
-                <div class="flex items-center gap-2">
-                    <span class="text-gray-500 text-sm w-6">{{ loop.index }}.</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--text-muted); width:20px; text-align:right; flex-shrink:0;">{{ loop.index }}.</span>
                     <input
                         type="text"
                         name="custom_names"
                         value="{{ file.stem }}"
-                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                        style="flex:1; padding:8px 12px; font-size:0.8125rem; border-radius:2px;"
                     >
                 </div>
                 {% endfor %}
             </div>
 
-            <!-- Batch prefix input -->
+            <!-- Batch prefix -->
             {% if uploaded_files|length > 1 %}
-            <div id="upload-batch-prefix" class="hidden mt-3">
-                <div class="flex items-center gap-3">
-                    <input
-                        type="text"
-                        name="batch_prefix"
-                        placeholder="Prefix (e.g. 'Track')"
-                        class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
-                        oninput="updateBatchPreview(this.value)"
-                    >
-                </div>
-                <div id="upload-batch-preview" class="mt-2 text-gray-500 text-xs space-y-1">
+            <div id="upload-batch-prefix" style="display:none; margin-top:10px;">
+                <input
+                    type="text"
+                    name="batch_prefix"
+                    placeholder="Prefix — e.g. Track"
+                    style="width:100%; padding:9px 12px; font-size:0.8125rem; border-radius:2px;"
+                    oninput="updateBatchPreview(this.value)"
+                >
+                <div id="upload-batch-preview" style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
                     {% for file in uploaded_files %}
-                    <p><span class="batch-preview-name">Track</span> {{ '%02d' % loop.index }}.mp3</p>
+                    <p style="font-size:0.72rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace;"><span class="batch-preview-name">Track</span> {{ '%02d' % loop.index }}.mp3</p>
                     {% endfor %}
                 </div>
             </div>
             {% endif %}
         </div>
 
-        <button
-            type="submit"
-            class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-        >
+        <button type="submit" class="btn-primary">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
             Extract Audio from {{ uploaded_files|length }} file(s)
         </button>
     </form>
 
-    <!-- Cancel button -->
+    <!-- Cancel -->
     <button
         type="button"
         hx-post="/upload/cancel"
         hx-target="#upload-options"
         hx-include="[name='temp_paths']"
-        class="w-full py-2 mt-2 text-gray-400 hover:text-gray-300 text-sm transition-colors"
+        style="width:100%; margin-top:8px; padding:10px; font-size:0.75rem; color:var(--text-muted); background:none; border:none; cursor:pointer; transition:color .15s; font-family:'DM Sans',sans-serif; letter-spacing:0.04em;"
+        onmouseover="this.style.color='var(--text-dim)'"
+        onmouseout="this.style.color='var(--text-muted)'"
     >
         Cancel and remove uploaded files
     </button>
 
-    <div id="extract-loading" class="htmx-indicator text-center py-8">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-        <p class="mt-2 text-gray-400">Extracting audio... This may take a moment.</p>
+    <!-- Extract loading indicator -->
+    <div id="extract-loading" class="htmx-indicator" style="align-items:center; justify-content:center; gap:12px; padding:28px 0;">
+        <div class="spinner"></div>
+        <span style="font-size:0.8125rem; color:var(--text-muted);">Extracting audio… this may take a moment</span>
     </div>
+
 </div>
 
 <script>
 function toggleUploadRenameUI() {
-    const mode = document.querySelector('input[name="rename_mode"]:checked').value;
+    const mode       = document.querySelector('input[name="rename_mode"]:checked').value;
     const individual = document.getElementById('upload-individual-names');
-    const batch = document.getElementById('upload-batch-prefix');
-
-    individual.classList.toggle('hidden', mode !== 'individual');
-    if (batch) batch.classList.toggle('hidden', mode !== 'batch');
+    const batch      = document.getElementById('upload-batch-prefix');
+    individual.style.display = mode === 'individual' ? 'flex' : 'none';
+    if (batch) batch.style.display = mode === 'batch' ? 'block' : 'none';
 }
 
 function updateBatchPreview(prefix) {
@@ -148,8 +149,9 @@ function updateBatchPreview(prefix) {
     });
 }
 </script>
+
 {% else %}
-<div class="bg-red-900/30 border border-red-500 rounded-lg p-4">
-    <p class="text-red-300">No valid video files were uploaded.</p>
+<div style="background:var(--red-dim); border:1px solid rgba(248,113,113,0.3); padding:16px; border-radius:2px;" class="fade-up">
+    <p style="font-size:0.875rem; color:var(--red);">No valid video files were uploaded.</p>
 </div>
 {% endif %}

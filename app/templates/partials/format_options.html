@@ -1,38 +1,40 @@
-<div class="border-t border-gray-700 pt-6">
-    <!-- Video previews -->
-    <div class="space-y-4 mb-6">
-        <h3 class="font-semibold text-lg">{{ results|length }} video(s) found</h3>
+<div style="border-top:1px solid var(--border); padding-top:24px; margin-top:24px;" class="fade-up">
 
-        {% for item in results %}
-        <div class="bg-gray-700/30 rounded-lg p-4 {% if item.error %}border border-red-500/50{% endif %}">
-            {% if item.error %}
-            <div class="flex items-center gap-3 text-red-400">
-                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <div>
-                    <p class="text-sm truncate max-w-md">{{ item.url }}</p>
-                    <p class="text-red-300 text-sm">{{ item.error }}</p>
+    <!-- Video previews -->
+    <div style="margin-bottom:22px;">
+        <p style="font-size:0.68rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; font-family:'JetBrains Mono',monospace;">
+            {{ results|length }} video(s) found
+        </p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            {% for item in results %}
+            <div style="background:var(--surf-2); border:1px solid var(--border); padding:14px; border-radius:2px; {% if item.error %}border-color:rgba(248,113,113,0.3);{% endif %}">
+                {% if item.error %}
+                <div style="display:flex; align-items:flex-start; gap:10px; color:var(--red);">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0; margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                        <p style="font-size:0.75rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:420px; font-family:'JetBrains Mono',monospace; margin-bottom:3px;">{{ item.url }}</p>
+                        <p style="font-size:0.8125rem;">{{ item.error }}</p>
+                    </div>
                 </div>
-            </div>
-            {% else %}
-            <div class="flex items-start gap-4">
-                {% if item.info.thumbnail %}
-                <img src="{{ item.info.thumbnail }}" alt="Thumbnail" class="w-24 h-16 object-cover rounded flex-shrink-0">
+                {% else %}
+                <div style="display:flex; align-items:flex-start; gap:14px;">
+                    {% if item.info.thumbnail %}
+                    <img src="{{ item.info.thumbnail }}" alt="Thumbnail" style="width:88px; height:58px; object-fit:cover; border-radius:2px; flex-shrink:0; border:1px solid var(--border-2);">
+                    {% endif %}
+                    <div style="min-width:0; flex:1;">
+                        <p style="font-size:0.875rem; font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.info.title }}</p>
+                        {% if item.info.uploader %}
+                        <p style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">{{ item.info.uploader }}</p>
+                        {% endif %}
+                        {% if item.info.duration %}
+                        <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px; font-family:'JetBrains Mono',monospace;">{{ (item.info.duration // 60) }}:{{ '%02d' % (item.info.duration % 60) }}</p>
+                        {% endif %}
+                    </div>
+                </div>
                 {% endif %}
-                <div class="min-w-0 flex-1">
-                    <h4 class="font-medium truncate">{{ item.info.title }}</h4>
-                    {% if item.info.uploader %}
-                    <p class="text-gray-400 text-sm">{{ item.info.uploader }}</p>
-                    {% endif %}
-                    {% if item.info.duration %}
-                    <p class="text-gray-500 text-sm">{{ (item.info.duration // 60) }}:{{ '%02d' % (item.info.duration % 60) }}</p>
-                    {% endif %}
-                </div>
             </div>
-            {% endif %}
+            {% endfor %}
         </div>
-        {% endfor %}
     </div>
 
     {% set valid_results = results | selectattr('info') | list %}
@@ -41,165 +43,150 @@
         hx-post="/download"
         hx-target="#download-result"
         hx-indicator="#download-loading"
-        class="space-y-4"
+        style="display:flex; flex-direction:column; gap:16px;"
     >
-        <!-- Hidden field with all valid URLs -->
         <input type="hidden" name="urls" value="{{ valid_results | map(attribute='url') | join('\n') }}">
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Video Download -->
-            <div class="bg-gray-700/50 rounded-lg p-4">
-                <h4 class="font-medium mb-3 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                    </svg>
-                    Download as Video
-                    <span class="text-gray-500 text-sm font-normal">(saved to /videos)</span>
-                </h4>
+        <!-- Format selection -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
 
-                <div class="space-y-2">
-                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                        <input type="radio" name="download_type" value="video" checked class="text-blue-500">
-                        <span>Best quality (recommended)</span>
+            <!-- Video quality -->
+            <div style="background:var(--surf-2); border:1px solid var(--border); padding:16px; border-radius:2px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                    <span class="label-tag label-video">Video</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">saved to /videos</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="download_type" value="video" checked>
+                        <span>Best quality <span style="font-size:0.7rem; color:var(--text-muted);">recommended</span></span>
                     </label>
-                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                        <input type="radio" name="download_type" value="video" class="text-blue-500" data-quality="1080p">
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="download_type" value="video" data-quality="1080p">
                         <span>1080p</span>
                     </label>
-                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                        <input type="radio" name="download_type" value="video" class="text-blue-500" data-quality="720p">
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="download_type" value="video" data-quality="720p">
                         <span>720p</span>
                     </label>
-                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                        <input type="radio" name="download_type" value="video" class="text-blue-500" data-quality="480p">
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="download_type" value="video" data-quality="480p">
                         <span>480p</span>
                     </label>
                 </div>
             </div>
 
-            <!-- Audio Extract -->
-            <div class="bg-gray-700/50 rounded-lg p-4">
-                <h4 class="font-medium mb-3 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
-                    </svg>
-                    Extract Audio
-                    <span class="text-gray-500 text-sm font-normal">(saved to /audios)</span>
-                </h4>
-
-                <div class="space-y-2">
-                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                        <input type="radio" name="download_type" value="audio" class="text-blue-500" data-format="mp3">
-                        <span>MP3 (192kbps)</span>
+            <!-- Audio extract -->
+            <div style="background:var(--surf-2); border:1px solid var(--border); padding:16px; border-radius:2px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                    <span class="label-tag label-audio">Audio</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted);">saved to /audios</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="download_type" value="audio" data-format="mp3">
+                        <span>MP3 <span style="font-size:0.7rem; color:var(--text-muted);">192kbps</span></span>
                     </label>
-                    <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                        <input type="radio" name="download_type" value="audio" class="text-blue-500" data-format="m4a">
-                        <span>M4A (AAC)</span>
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="download_type" value="audio" data-format="m4a">
+                        <span>M4A <span style="font-size:0.7rem; color:var(--text-muted);">AAC</span></span>
                     </label>
                 </div>
             </div>
+
         </div>
 
-        <input type="hidden" name="quality" id="quality-input" value="best">
-        <input type="hidden" name="audio_format" id="audio-format-input" value="mp3">
+        <input type="hidden" name="quality"       id="quality-input"      value="best">
+        <input type="hidden" name="audio_format"  id="audio-format-input" value="mp3">
 
-        <!-- Rename Options -->
-        <div class="bg-gray-700/30 rounded-lg p-4">
-            <h4 class="font-medium mb-3 flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                </svg>
-                Rename Output
-            </h4>
-            <div class="space-y-2">
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="rename_mode" value="original" checked class="text-blue-500" onchange="toggleRenameUI()">
+        <!-- Rename options -->
+        <div style="background:var(--surf-2); border:1px solid var(--border); padding:16px; border-radius:2px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                <svg width="13" height="13" fill="none" stroke="var(--text-muted)" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                <span style="font-size:0.68rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);">Rename Output</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="rename_mode" value="original" checked onchange="toggleRenameUI()">
                     <span>Keep original filenames</span>
                 </label>
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="rename_mode" value="individual" class="text-blue-500" onchange="toggleRenameUI()">
+                <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="rename_mode" value="individual" onchange="toggleRenameUI()">
                     <span>Rename individually</span>
                 </label>
                 {% if valid_results|length > 1 %}
-                <label class="flex items-center gap-3 p-2 rounded hover:bg-gray-600/50 cursor-pointer">
-                    <input type="radio" name="rename_mode" value="batch" class="text-blue-500" onchange="toggleRenameUI()">
+                <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:2px; cursor:pointer; font-size:0.8125rem; color:var(--text-dim); transition:background .1s;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="rename_mode" value="batch" onchange="toggleRenameUI()">
                     <span>Sequential numbering</span>
                 </label>
                 {% endif %}
             </div>
 
-            <!-- Individual rename inputs (pre-filled with video titles) -->
-            <div id="dl-individual-names" class="hidden mt-3 space-y-2">
+            <!-- Individual name inputs -->
+            <div id="dl-individual-names" style="display:none; margin-top:10px; flex-direction:column; gap:6px;">
                 {% for item in valid_results %}
-                <div class="flex items-center gap-2">
-                    <span class="text-gray-500 text-sm w-6">{{ loop.index }}.</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--text-muted); width:20px; text-align:right; flex-shrink:0;">{{ loop.index }}.</span>
                     <input
                         type="text"
                         name="custom_names"
-                        class="dl-custom-name flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                        class="dl-custom-name"
                         value="{{ item.info.title }}"
+                        style="flex:1; padding:8px 12px; font-size:0.8125rem; border-radius:2px;"
                     >
                 </div>
                 {% endfor %}
             </div>
 
-            <!-- Batch prefix input -->
+            <!-- Batch prefix -->
             {% if valid_results|length > 1 %}
-            <div id="dl-batch-prefix" class="hidden mt-3">
+            <div id="dl-batch-prefix" style="display:none; margin-top:10px;">
                 <input
                     type="text"
                     name="batch_prefix"
                     id="dl-batch-input"
-                    placeholder="Prefix (e.g. 'Episode')"
-                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Prefix — e.g. Episode"
+                    style="width:100%; padding:9px 12px; font-size:0.8125rem; border-radius:2px;"
                 >
             </div>
             {% endif %}
         </div>
 
-        <button
-            type="submit"
-            class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
-        >
+        <button type="submit" class="btn-primary">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Download {{ valid_results|length }} item(s)
         </button>
     </form>
 
-    <div id="download-loading" class="htmx-indicator text-center py-8">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-        <p class="mt-2 text-gray-400">Downloading {{ valid_results|length }} item(s)... This may take a moment.</p>
+    <!-- Download loading indicator -->
+    <div id="download-loading" class="htmx-indicator" style="align-items:center; justify-content:center; gap:12px; padding:28px 0;">
+        <div class="spinner"></div>
+        <span style="font-size:0.8125rem; color:var(--text-muted);">Downloading {{ valid_results|length }} item(s)… this may take a moment</span>
     </div>
 
-    <div id="download-result" class="mt-4">
-        <!-- Download result will appear here -->
-    </div>
+    <div id="download-result" style="margin-top:4px;"></div>
 
     <script>
-    // Update hidden inputs based on radio selection
     document.querySelectorAll('input[name="download_type"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const qualityInput = document.getElementById('quality-input');
-            const audioFormatInput = document.getElementById('audio-format-input');
-
             if (this.value === 'video') {
-                qualityInput.value = this.dataset.quality || 'best';
+                document.getElementById('quality-input').value      = this.dataset.quality || 'best';
             } else if (this.value === 'audio') {
-                audioFormatInput.value = this.dataset.format || 'mp3';
+                document.getElementById('audio-format-input').value = this.dataset.format  || 'mp3';
             }
         });
     });
 
-    // Rename UI toggle
     function toggleRenameUI() {
-        const mode = document.querySelector('input[name="rename_mode"]:checked').value;
+        const mode       = document.querySelector('input[name="rename_mode"]:checked').value;
         const individual = document.getElementById('dl-individual-names');
-        const batch = document.getElementById('dl-batch-prefix');
-
-        individual.classList.toggle('hidden', mode !== 'individual');
-        if (batch) batch.classList.toggle('hidden', mode !== 'batch');
+        const batch      = document.getElementById('dl-batch-prefix');
+        individual.style.display = mode === 'individual' ? 'flex' : 'none';
+        if (batch) batch.style.display = mode === 'batch' ? 'block' : 'none';
     }
     </script>
+
     {% else %}
-    <p class="text-gray-400 text-center py-4">No valid videos to download. Please check the URLs and try again.</p>
+    <p style="font-size:0.875rem; color:var(--text-muted); text-align:center; padding:20px 0;">No valid videos to download. Please check the URLs and try again.</p>
     {% endif %}
 </div>

@@ -1,25 +1,34 @@
 {% extends "base.html" %}
-
-{% block title %}Download History - StreamSnap{% endblock %}
+{% block title %}History — StreamSnap{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Download History</h1>
-    <a href="/" class="text-blue-400 hover:text-blue-300">New Download</a>
+
+<!-- Header -->
+<div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:28px; gap:16px; flex-wrap:wrap;">
+    <div>
+        <p style="font-size:0.68rem; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--text-muted); margin-bottom:5px; font-family:'JetBrains Mono',monospace;">Your Files</p>
+        <h1 style="font-family:'Bebas Neue',cursive; font-size:2.4rem; line-height:1; letter-spacing:0.06em; color:var(--text);">
+            Download <span style="color:var(--snap);">History</span>
+        </h1>
+    </div>
+    <a href="/" style="font-size:0.7rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--snap); text-decoration:none; display:flex; align-items:center; gap:6px; padding-bottom:4px;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Download
+    </a>
 </div>
 
 {% if downloads %}
-<div class="flex items-center gap-3 mb-4">
+
+<!-- Bulk action bar -->
+<div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
     <form id="bulk-delete-form" hx-post="/history/delete-bulk" hx-swap="none">
         <button
             type="submit"
             id="delete-selected-btn"
             disabled
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+            class="btn-danger"
         >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Delete Selected (<span id="selected-count">0</span>)
         </button>
     </form>
@@ -27,109 +36,101 @@
         hx-post="/history/delete-all"
         hx-confirm="Delete ALL downloads? This cannot be undone."
         hx-swap="none"
-        class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+        class="btn-ghost"
     >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-        </svg>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
         Delete All
     </button>
 </div>
 
-<div class="bg-gray-800 rounded-lg overflow-hidden">
-    <table class="w-full">
-        <thead class="bg-gray-700">
-            <tr>
-                <th class="px-4 py-3 text-left">
+<!-- Table -->
+<div style="background:var(--surf); border:1px solid var(--border); border-radius:2px; overflow:hidden;">
+    <table style="width:100%; border-collapse:collapse;">
+        <thead>
+            <tr style="background:var(--surf-2); border-bottom:1px solid var(--border-2);">
+                <th style="padding:11px 14px; text-align:left; width:36px;">
                     <input
                         type="checkbox"
                         id="select-all"
-                        class="w-4 h-4 rounded border-gray-500 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                        style="width:14px; height:14px;"
                     >
                 </th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Title</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Type</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Quality</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Size</th>
-                <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">Date</th>
-                <th class="px-4 py-3 text-right text-sm font-medium text-gray-300">Actions</th>
+                <th style="padding:11px 14px; text-align:left; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);">Title</th>
+                <th style="padding:11px 14px; text-align:left; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); white-space:nowrap;">Type</th>
+                <th style="padding:11px 14px; text-align:left; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);">Quality</th>
+                <th style="padding:11px 14px; text-align:left; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);">Size</th>
+                <th style="padding:11px 14px; text-align:left; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);">Date</th>
+                <th style="padding:11px 14px; text-align:right; font-size:0.65rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted);">Actions</th>
             </tr>
         </thead>
-        <tbody class="divide-y divide-gray-700">
+        <tbody>
             {% for download in downloads %}
-            <tr id="row-{{ download.id }}" class="hover:bg-gray-700/50">
-                <td class="px-4 py-3">
+            <tr
+                id="row-{{ download.id }}"
+                style="border-bottom:1px solid var(--border); transition:background .1s;"
+                onmouseover="this.style.background='var(--surf-2)'"
+                onmouseout="this.style.background='transparent'"
+            >
+                <td style="padding:12px 14px;">
                     <input
                         type="checkbox"
                         name="ids"
                         value="{{ download.id }}"
                         form="bulk-delete-form"
-                        class="row-checkbox w-4 h-4 rounded border-gray-500 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                        class="row-checkbox"
+                        style="width:14px; height:14px;"
                     >
                 </td>
-                <td class="px-4 py-3">
-                    <div class="max-w-xs truncate" title="{{ download.title }}">
+                <td style="padding:12px 14px; max-width:260px;">
+                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.8125rem; color:var(--text);" title="{{ download.title }}">
                         {{ download.title or download.filename }}
                     </div>
-                    <div class="text-xs text-gray-500 truncate max-w-xs" title="{{ download.url }}">
+                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:0.68rem; color:var(--text-muted); margin-top:2px; font-family:'JetBrains Mono',monospace;" title="{{ download.url }}">
                         {{ download.url }}
                     </div>
                 </td>
-                <td class="px-4 py-3">
-                    <span class="inline-flex items-center gap-1 text-sm">
-                        {% if download.format_type == 'audio' %}
-                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
-                        </svg>
-                        <span class="text-purple-400">Audio</span>
-                        {% else %}
-                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
-                        <span class="text-blue-400">Video</span>
-                        {% endif %}
-                    </span>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-300">
-                    {{ download.quality or 'N/A' }}
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-300">
-                    {% if download.file_size %}
-                    {{ (download.file_size / 1024 / 1024) | round(1) }} MB
+                <td style="padding:12px 14px;">
+                    {% if download.format_type == 'audio' %}
+                    <span class="label-tag label-audio">Audio</span>
                     {% else %}
-                    N/A
+                    <span class="label-tag label-video">Video</span>
                     {% endif %}
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-400">
-                    {{ download.created_at.strftime('%Y-%m-%d %H:%M') }}
+                <td style="padding:12px 14px; font-size:0.8rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">
+                    {{ download.quality or '—' }}
                 </td>
-                <td class="px-4 py-3 text-right">
-                    <div class="flex justify-end gap-2">
+                <td style="padding:12px 14px; font-size:0.8rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace; white-space:nowrap;">
+                    {% if download.file_size %}
+                    {{ (download.file_size / 1024 / 1024) | round(1) }} MB
+                    {% else %}—{% endif %}
+                </td>
+                <td style="padding:12px 14px; font-size:0.72rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; white-space:nowrap;">
+                    {{ download.created_at.strftime('%Y-%m-%d') }}<br>
+                    <span style="color:var(--text-muted); opacity:0.7;">{{ download.created_at.strftime('%H:%M') }}</span>
+                </td>
+                <td style="padding:12px 14px; text-align:right;">
+                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:6px;">
                         {% if download.file_exists %}
                         <a
                             href="/file/{{ download.id }}"
-                            class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                            class="btn-dl"
                             download
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                            </svg>
-                            Download
+                            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Save
                         </a>
                         {% else %}
-                        <span class="text-sm text-gray-500">File deleted</span>
+                        <span style="font-size:0.7rem; color:var(--text-muted); font-style:italic;">deleted</span>
                         {% endif %}
                         <button
                             hx-delete="/history/{{ download.id }}"
                             hx-target="#row-{{ download.id }}"
                             hx-swap="outerHTML"
                             hx-confirm="Delete this download?"
-                            class="inline-flex items-center gap-1 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                            class="btn-danger"
+                            style="padding:5px 10px;"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                            Delete
+                            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                     </div>
                 </td>
@@ -138,34 +139,38 @@
         </tbody>
     </table>
 </div>
+
 {% else %}
-<div class="bg-gray-800 rounded-lg p-8 text-center">
-    <svg class="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-    </svg>
-    <h2 class="text-xl font-semibold text-gray-400 mb-2">No downloads yet</h2>
-    <p class="text-gray-500 mb-4">Your download history will appear here.</p>
-    <a href="/" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+
+<!-- Empty state -->
+<div style="background:var(--surf); border:1px solid var(--border); padding:64px 24px; text-align:center; border-radius:2px;">
+    <div style="width:56px; height:56px; margin:0 auto 20px; border:1px solid var(--border-2); border-radius:50%; display:flex; align-items:center; justify-content:center;">
+        <svg width="24" height="24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+    </div>
+    <h2 style="font-family:'Bebas Neue',cursive; font-size:1.8rem; letter-spacing:0.06em; color:var(--text-dim); margin-bottom:8px;">No Downloads Yet</h2>
+    <p style="font-size:0.8125rem; color:var(--text-muted); margin-bottom:24px;">Your download history will appear here.</p>
+    <a href="/" class="btn-primary" style="display:inline-flex; width:auto; padding:11px 28px;">
         Start Downloading
     </a>
 </div>
+
 {% endif %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const selectAll = document.getElementById('select-all');
-    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
-    const deleteBtn = document.getElementById('delete-selected-btn');
-    const selectedCount = document.getElementById('selected-count');
-    const bulkForm = document.getElementById('bulk-delete-form');
+    const selectAll    = document.getElementById('select-all');
+    const rowCheckboxes= document.querySelectorAll('.row-checkbox');
+    const deleteBtn    = document.getElementById('delete-selected-btn');
+    const selectedCount= document.getElementById('selected-count');
+    const bulkForm     = document.getElementById('bulk-delete-form');
 
     function updateState() {
         const checked = document.querySelectorAll('.row-checkbox:checked');
-        const count = checked.length;
-        selectedCount.textContent = count;
-        deleteBtn.disabled = count === 0;
-        selectAll.checked = count === rowCheckboxes.length && count > 0;
-        selectAll.indeterminate = count > 0 && count < rowCheckboxes.length;
+        const count   = checked.length;
+        selectedCount.textContent    = count;
+        deleteBtn.disabled           = count === 0;
+        selectAll.checked            = count === rowCheckboxes.length && count > 0;
+        selectAll.indeterminate      = count > 0 && count < rowCheckboxes.length;
     }
 
     if (selectAll) {
@@ -175,9 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    rowCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateState);
-    });
+    rowCheckboxes.forEach(cb => cb.addEventListener('change', updateState));
 
     if (bulkForm) {
         bulkForm.addEventListener('htmx:confirm', function(e) {
@@ -189,4 +192,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
 {% endblock %}

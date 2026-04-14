@@ -1,55 +1,62 @@
 {% extends "base.html" %}
-
-{% block title %}Login - StreamSnap{% endblock %}
+{% block title %}Sign In — StreamSnap{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto mt-16">
-    <div class="bg-gray-800 rounded-lg p-8 shadow-lg">
-        <h1 class="text-2xl font-bold text-center mb-6">Login</h1>
+<div style="display:flex; align-items:flex-start; justify-content:center; padding-top:60px;">
+    <div style="width:100%; max-width:400px;">
 
-        {% if error %}
-        <div class="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded mb-4">
-            {{ error }}
+        <!-- Wordmark -->
+        <div style="margin-bottom:36px; text-align:center;">
+            <div style="font-family:'Bebas Neue',cursive; font-size:2.8rem; line-height:1; letter-spacing:0.08em; margin-bottom:6px;">
+                <span style="color:var(--snap);">STREAM</span><span style="color:var(--text);">SNAP</span>
+            </div>
+            <p style="font-size:0.75rem; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase; font-weight:500;">Sign in to your account</p>
         </div>
-        {% endif %}
 
-        <form method="post" action="/login" class="space-y-4">
-            <div>
-                <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    required
-                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-white"
-                    placeholder="Enter your username"
-                >
+        <!-- Card -->
+        <div style="background:var(--surf); border:1px solid var(--border-2); padding:32px; border-radius:2px;">
+
+            {% if error %}
+            <div style="background:var(--red-dim); border:1px solid rgba(248,113,113,0.3); padding:11px 14px; margin-bottom:20px; border-radius:2px; display:flex; align-items:center; gap:10px;">
+                <svg width="14" height="14" fill="none" stroke="var(--red)" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span style="font-size:0.8125rem; color:var(--red);">{{ error }}</span>
             </div>
+            {% endif %}
 
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    required
-                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-white"
-                    placeholder="Enter your password"
-                >
-            </div>
+            <form method="post" action="/login">
+                <div style="margin-bottom:18px;">
+                    <label for="username" style="display:block; font-size:0.7rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px;">Username</label>
+                    <input
+                        type="text"
+                        id="username"
+                        name="username"
+                        required
+                        placeholder="Enter your username"
+                        style="width:100%; padding:10px 14px; background:var(--surf-2); border:1px solid var(--border-2); color:var(--text); border-radius:2px; font-size:0.875rem;"
+                    >
+                </div>
 
-            <button
-                type="submit"
-                class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors"
-            >
-                Login
-            </button>
-        </form>
+                <div style="margin-bottom:24px;">
+                    <label for="password" style="display:block; font-size:0.7rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px;">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        required
+                        placeholder="Enter your password"
+                        style="width:100%; padding:10px 14px; background:var(--surf-2); border:1px solid var(--border-2); color:var(--text); border-radius:2px; font-size:0.875rem;"
+                    >
+                </div>
 
-        <p class="mt-6 text-center text-gray-400">
-            Don't have an account?
-            <a href="/register" class="text-blue-400 hover:text-blue-300">Register</a>
+                <button type="submit" class="btn-primary">Sign In</button>
+            </form>
+        </div>
+
+        <p style="text-align:center; margin-top:20px; font-size:0.8125rem; color:var(--text-muted);">
+            No account?
+            <a href="/register" style="color:var(--snap); text-decoration:none; font-weight:500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Create one</a>
         </p>
+
     </div>
 </div>
 {% endblock %}
