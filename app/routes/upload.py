@@ -114,9 +114,8 @@ async def upload_and_extract(
         download_records.append(record)
 
     return templates.TemplateResponse(
-        "partials/download_complete.html",
+        request, "partials/download_complete.html",
         {
-            "request": request,
             "downloads": download_records,
             "errors": errors,
             "single_mode": len(files) == 1,

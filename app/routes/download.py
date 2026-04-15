@@ -29,8 +29,8 @@ async def index(
 ):
     """Main download page."""
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "user": user}
+        request, "index.html",
+        {"user": user}
     )
 
 
@@ -50,17 +50,16 @@ async def fetch_formats(
 
     if not url_list:
         return templates.TemplateResponse(
-            "partials/error.html",
-            {"request": request, "error": "Please enter at least one URL"}
+            request, "partials/error.html",
+            {"error": "Please enter at least one URL"}
         )
 
     # Fetch info for all URLs
     results = fetch_multiple_video_info(url_list)
 
     return templates.TemplateResponse(
-        "partials/format_options.html",
+        request, "partials/format_options.html",
         {
-            "request": request,
             "results": results,
             "single_mode": len(results) == 1,
         }
@@ -87,8 +86,8 @@ async def start_download(
 
     if not url_list:
         return templates.TemplateResponse(
-            "partials/error.html",
-            {"request": request, "error": "No URLs provided"}
+            request, "partials/error.html",
+            {"error": "No URLs provided"}
         )
 
     # Parse custom names for individual rename mode
@@ -160,9 +159,8 @@ async def start_download(
             errors.append({"url": url, "error": str(e)})
 
     return templates.TemplateResponse(
-        "partials/download_complete.html",
+        request, "partials/download_complete.html",
         {
-            "request": request,
             "downloads": download_records,
             "errors": errors,
             "single_mode": len(url_list) == 1,

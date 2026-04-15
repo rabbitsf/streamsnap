@@ -26,8 +26,9 @@ git clone <your-repo-url> /srv/streamsnap
 cd /srv/streamsnap
 
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate   # only needed for the pip install below
 pip install -r requirements.txt
+deactivate                 # venv no longer needed — systemd uses the absolute path
 ```
 
 ---
@@ -56,7 +57,7 @@ Then create the file:
 
 ```bash
 cat > /srv/streamsnap/.env << 'EOF'
-SECRET_KEY=<paste-generated-key-here>
+SECRET_KEY=9869276bd97ce805b4d39476353726d9221d45dc284ce465685e2d3891414dfb
 DATABASE_URL=sqlite:////srv/streamsnap/streamsnap.db
 EOF
 chmod 600 /srv/streamsnap/.env
@@ -90,7 +91,7 @@ WorkingDirectory=/srv/streamsnap
 EnvironmentFile=/srv/streamsnap/.env
 ExecStart=/srv/streamsnap/venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 \
-    --port 8000 \
+    --port 8001 \
     --workers 2
 Restart=always
 RestartSec=5
@@ -125,19 +126,16 @@ sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
 
 ## 7. Configure nginx
 
+> **Note:** Ports 80 and 443 are already used by another app on this server.
+> StreamSnap is served on port **8443** (`https://<server-ip>:8443`).
+
 ```bash
 sudo nano /etc/nginx/sites-available/streamsnap
 ```
 
 ```nginx
 server {
-    listen 80;
-    server_name _;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
+    listen 8443 ssl;
     server_name _;
 
     ssl_certificate     /etc/nginx/ssl/streamsnap.crt;
@@ -148,7 +146,7 @@ server {
     client_max_body_size 2G;
 
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -171,9 +169,8 @@ sudo nginx -t && sudo systemctl reload nginx
 ## 8. Firewall
 
 ```bash
-# Allow internal network on ports 80 (redirect) and 443 (HTTPS)
-sudo ufw allow from 192.168.0.0/16 to any port 80
-sudo ufw allow from 192.168.0.0/16 to any port 443
+# Allow internal network on port 8443 (HTTPS for StreamSnap)
+sudo ufw allow from 10.0.0.0/8 to any port 8443
 ```
 
 Adjust the subnet (`192.168.0.0/16` or `10.0.0.0/8`) to match your network.
@@ -182,7 +179,7 @@ Adjust the subnet (`192.168.0.0/16` or `10.0.0.0/8`) to match your network.
 
 ## Accessing the app
 
-Navigate to `https://<server-private-ip>` in a browser.
+Navigate to `https://<server-private-ip>:8443` in a browser.
 
 On first visit, the browser will show a "Your connection is not private" warning due to the self-signed certificate. Click **Advanced → Proceed** to continue. This is a one-time step per browser.
 

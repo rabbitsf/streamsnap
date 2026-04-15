@@ -28,8 +28,8 @@ async def login_page(
     if user:
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse(
-        "login.html",
-        {"request": request, "error": None}
+        request, "login.html",
+        {"error": None}
     )
 
 
@@ -44,8 +44,8 @@ async def login(
     user = authenticate_user(db, username, password)
     if not user:
         return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Invalid username or password"},
+            request, "login.html",
+            {"error": "Invalid username or password"},
             status_code=400,
         )
 
@@ -73,8 +73,8 @@ async def register_page(
     if user:
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse(
-        "register.html",
-        {"request": request, "error": None}
+        request, "register.html",
+        {"error": None}
     )
 
 
@@ -90,20 +90,20 @@ async def register(
     # Validate input
     if len(username) < 3:
         return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Username must be at least 3 characters"},
+            request, "register.html",
+            {"error": "Username must be at least 3 characters"},
             status_code=400,
         )
     if len(password) < 6:
         return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Password must be at least 6 characters"},
+            request, "register.html",
+            {"error": "Password must be at least 6 characters"},
             status_code=400,
         )
     if password != confirm_password:
         return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Passwords do not match"},
+            request, "register.html",
+            {"error": "Passwords do not match"},
             status_code=400,
         )
 
@@ -111,8 +111,8 @@ async def register(
     existing_user = db.query(User).filter(User.username == username).first()
     if existing_user:
         return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Username already taken"},
+            request, "register.html",
+            {"error": "Username already taken"},
             status_code=400,
         )
 

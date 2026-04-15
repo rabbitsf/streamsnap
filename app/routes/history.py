@@ -31,9 +31,8 @@ async def history_page(
         download.file_exists = Path(download.file_path).exists()
 
     return templates.TemplateResponse(
-        "history.html",
+        request, "history.html",
         {
-            "request": request,
             "user": user,
             "downloads": downloads,
         }
