@@ -1,5 +1,10 @@
+import ipaddress
+import logging
+import re
+import socket
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
@@ -20,6 +25,46 @@ from app.services.downloader import (
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+logger = logging.getLogger(__name__)
+
+# Input allowlists
+ALLOWED_AUDIO_FORMATS = {"mp3", "m4a", "wav"}
+ALLOWED_AUDIO_QUALITIES = {"128", "192", "320"}
+ALLOWED_QUALITIES = {"best", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p"}
+ALLOWED_DOWNLOAD_TYPES = {"video", "audio"}
+_FORMAT_ID_RE = re.compile(r'^[a-zA-Z0-9_\-+/]+$')
+
+# Networks blocked to prevent SSRF
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def _is_safe_url(url: str) -> bool:
+    """Return False for non-HTTP(S) URLs and private/loopback IP targets."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        for network in _BLOCKED_NETWORKS:
+            try:
+                if ip in network:
+                    return False
+            except TypeError:
+                pass
+        return True
+    except Exception:
+        return False
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -41,7 +86,6 @@ async def fetch_formats(
     user: User = Depends(get_current_user),
 ):
     """Fetch available formats for one or more URLs (HTMX endpoint)."""
-    # Parse URLs - split by newlines, commas, or spaces
     url_list = []
     for line in urls.replace(',', '\n').split('\n'):
         url = line.strip()
@@ -54,7 +98,14 @@ async def fetch_formats(
             {"error": "Please enter at least one URL"}
         )
 
-    # Fetch info for all URLs
+    # SSRF protection
+    for url in url_list:
+        if not _is_safe_url(url):
+            return templates.TemplateResponse(
+                request, "partials/error.html",
+                {"error": "Invalid or disallowed URL"}
+            )
+
     results = fetch_multiple_video_info(url_list)
 
     return templates.TemplateResponse(
@@ -69,11 +120,12 @@ async def fetch_formats(
 @router.post("/download", response_class=HTMLResponse)
 async def start_download(
     request: Request,
-    urls: str = Form(...),  # Comma or newline separated URLs
-    download_type: str = Form(...),  # "video" or "audio"
+    urls: str = Form(...),
+    download_type: str = Form(...),
     quality: str = Form("best"),
     format_id: Optional[str] = Form(None),
     audio_format: str = Form("mp3"),
+    audio_quality: str = Form("192"),
     rename_mode: str = Form("original"),
     custom_names: Optional[list[str]] = Form(None),
     batch_prefix: str = Form(""),
@@ -81,6 +133,33 @@ async def start_download(
     db: Session = Depends(get_db),
 ):
     """Start downloads for one or more URLs (HTMX endpoint)."""
+    # Validate enumerated inputs
+    if download_type not in ALLOWED_DOWNLOAD_TYPES:
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Invalid download type"}
+        )
+    if audio_format not in ALLOWED_AUDIO_FORMATS:
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Invalid audio format"}
+        )
+    if audio_quality not in ALLOWED_AUDIO_QUALITIES:
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Invalid audio quality"}
+        )
+    if quality not in ALLOWED_QUALITIES:
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Invalid quality selection"}
+        )
+    if format_id and not _FORMAT_ID_RE.match(format_id):
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Invalid format ID"}
+        )
+
     # Parse URLs
     url_list = [u.strip() for u in urls.replace(',', '\n').split('\n') if u.strip()]
 
@@ -90,7 +169,14 @@ async def start_download(
             {"error": "No URLs provided"}
         )
 
-    # Parse custom names for individual rename mode
+    # SSRF protection
+    for url in url_list:
+        if not _is_safe_url(url):
+            return templates.TemplateResponse(
+                request, "partials/error.html",
+                {"error": "Invalid or disallowed URL"}
+            )
+
     name_list = [n.strip() for n in (custom_names or []) if n.strip()]
 
     download_records = []
@@ -103,6 +189,7 @@ async def start_download(
                     url=url,
                     user_id=user.id,
                     audio_format=audio_format,
+                    audio_quality=audio_quality,
                 )
                 format_type = "audio"
                 quality_label = audio_format.upper()
@@ -156,7 +243,8 @@ async def start_download(
             download_records.append(download_record)
 
         except Exception as e:
-            errors.append({"url": url, "error": str(e)})
+            logger.error("Unexpected error downloading %s for user %s: %s", url, user.id, e, exc_info=True)
+            errors.append({"url": url, "error": "An unexpected error occurred. Please try again."})
 
     return templates.TemplateResponse(
         request, "partials/download_complete.html",

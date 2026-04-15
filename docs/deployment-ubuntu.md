@@ -59,6 +59,7 @@ Then create the file:
 cat > /srv/streamsnap/.env << 'EOF'
 SECRET_KEY=9869276bd97ce805b4d39476353726d9221d45dc284ce465685e2d3891414dfb
 DATABASE_URL=sqlite:////srv/streamsnap/streamsnap.db
+ALLOW_REGISTRATION=false
 EOF
 chmod 600 /srv/streamsnap/.env
 ```

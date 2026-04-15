@@ -5,6 +5,7 @@ All routes that need to download content MUST use this service.
 This is the single source of truth for yt-dlp operations.
 """
 
+import logging
 import os
 import re
 import subprocess
@@ -15,6 +16,11 @@ from typing import Optional
 import yt_dlp
 
 from app.config import DOWNLOADS_DIR
+
+logger = logging.getLogger(__name__)
+
+_ALLOWED_AUDIO_FORMATS = {"mp3", "m4a", "wav"}
+_ALLOWED_AUDIO_QUALITIES = {"128", "192", "320"}
 
 
 @dataclass
@@ -221,6 +227,17 @@ def download_video(
                 filepath = str(user_dir / f"{title}.{ext}")
 
             file_path = Path(filepath)
+
+            # Security: verify yt-dlp wrote within user's directory
+            try:
+                file_path.resolve().relative_to(user_dir.resolve())
+            except ValueError:
+                logger.error("yt-dlp wrote file outside user dir: %s (user %s)", filepath, user_id)
+                return DownloadResult(
+                    success=False, file_path=None, filename=None,
+                    title=None, file_size=None, error="Download failed: unexpected file location",
+                )
+
             file_size = file_path.stat().st_size if file_path.exists() else None
 
             return DownloadResult(
@@ -232,13 +249,14 @@ def download_video(
                 error=None,
             )
     except Exception as e:
+        logger.error("Video download failed for %s (user %s): %s", url, user_id, e, exc_info=True)
         return DownloadResult(
             success=False,
             file_path=None,
             filename=None,
             title=None,
             file_size=None,
-            error=str(e),
+            error="Download failed. Please check the URL and try again.",
         )
 
 
@@ -260,6 +278,17 @@ def extract_audio(
         audio_format: Output format ("mp3", "m4a", "wav", etc.)
         audio_quality: Bitrate in kbps ("128", "192", "320")
     """
+    if audio_format not in _ALLOWED_AUDIO_FORMATS:
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error=f"Unsupported audio format: {audio_format}",
+        )
+    if audio_quality not in _ALLOWED_AUDIO_QUALITIES:
+        return DownloadResult(
+            success=False, file_path=None, filename=None,
+            title=None, file_size=None, error=f"Unsupported audio quality: {audio_quality}",
+        )
+
     user_dir = get_user_download_dir(user_id, media_type="audio")
 
     ydl_opts = {
@@ -293,6 +322,16 @@ def extract_audio(
                             filepath = f
                             break
 
+            # Security: verify yt-dlp wrote within user's directory
+            try:
+                filepath.resolve().relative_to(user_dir.resolve())
+            except ValueError:
+                logger.error("yt-dlp wrote audio outside user dir: %s (user %s)", filepath, user_id)
+                return DownloadResult(
+                    success=False, file_path=None, filename=None,
+                    title=None, file_size=None, error="Download failed: unexpected file location",
+                )
+
             file_size = filepath.stat().st_size if filepath.exists() else None
 
             return DownloadResult(
@@ -304,13 +343,14 @@ def extract_audio(
                 error=None,
             )
     except Exception as e:
+        logger.error("Audio extraction failed for %s (user %s): %s", url, user_id, e, exc_info=True)
         return DownloadResult(
             success=False,
             file_path=None,
             filename=None,
             title=None,
             file_size=None,
-            error=str(e),
+            error="Download failed. Please check the URL and try again.",
         )
 
 
@@ -439,9 +479,10 @@ def extract_audio_from_file(
             title=None, file_size=None, error="Audio extraction timed out (5 min limit)",
         )
     except subprocess.CalledProcessError as e:
+        logger.error("FFmpeg failed for %s (user %s): %s", source_path, user_id, e.stderr)
         return DownloadResult(
             success=False, file_path=None, filename=None,
-            title=None, file_size=None, error=f"FFmpeg error: {e.stderr[:200]}",
+            title=None, file_size=None, error="Audio extraction failed. The file may be unsupported or corrupted.",
         )
 
     file_size = output_path.stat().st_size if output_path.exists() else None
@@ -519,5 +560,6 @@ def fetch_multiple_video_info(urls: list[str]) -> list[dict]:
             info = fetch_video_info(url)
             results.append({"url": url, "info": info, "error": None})
         except Exception as e:
-            results.append({"url": url, "info": None, "error": str(e)})
+            logger.error("Failed to fetch info for %s: %s", url, e, exc_info=True)
+            results.append({"url": url, "info": None, "error": "Could not fetch video info. Please check the URL."})
     return results

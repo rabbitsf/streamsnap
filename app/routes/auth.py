@@ -1,3 +1,5 @@
+import time
+from collections import defaultdict
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request, Form
@@ -11,12 +13,42 @@ from app.auth import (
     create_access_token,
     get_optional_user,
 )
-from app.config import ACCESS_TOKEN_EXPIRE_MINUTES, SESSION_COOKIE_NAME
+from app.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    SESSION_COOKIE_NAME,
+    ALLOW_REGISTRATION,
+)
 from app.database import get_db
 from app.models import User
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+# Simple in-memory rate limiter for login attempts
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_WINDOW = 60   # seconds
+_RATE_LIMIT_MAX = 10      # attempts per window per IP
+
+
+def _is_rate_limited(ip: str) -> bool:
+    """Return True if this IP has exceeded the login rate limit."""
+    now = time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _RATE_LIMIT_WINDOW]
+    if len(_login_attempts[ip]) >= _RATE_LIMIT_MAX:
+        return True
+    _login_attempts[ip].append(now)
+    return False
+
+
+def _set_session_cookie(response, token: str):
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=True,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+    )
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -41,6 +73,14 @@ async def login(
     db: Session = Depends(get_db),
 ):
     """Handle login form submission."""
+    ip = request.client.host if request.client else "unknown"
+    if _is_rate_limited(ip):
+        return templates.TemplateResponse(
+            request, "login.html",
+            {"error": "Too many login attempts. Please wait a minute."},
+            status_code=429,
+        )
+
     user = authenticate_user(db, username, password)
     if not user:
         return templates.TemplateResponse(
@@ -54,13 +94,7 @@ async def login(
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=access_token,
-        httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-    )
+    _set_session_cookie(response, access_token)
     return response
 
 
@@ -70,6 +104,8 @@ async def register_page(
     user: User = Depends(get_optional_user),
 ):
     """Display registration page."""
+    if not ALLOW_REGISTRATION:
+        return RedirectResponse(url="/login", status_code=303)
     if user:
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse(
@@ -87,6 +123,9 @@ async def register(
     db: Session = Depends(get_db),
 ):
     """Handle registration form submission."""
+    if not ALLOW_REGISTRATION:
+        return RedirectResponse(url="/login", status_code=303)
+
     # Validate input
     if len(username) < 3:
         return templates.TemplateResponse(
@@ -125,13 +164,7 @@ async def register(
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie(
-        key=SESSION_COOKIE_NAME,
-        value=access_token,
-        httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-    )
+    _set_session_cookie(response, access_token)
     return response
 
 

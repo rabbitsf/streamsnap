@@ -13,6 +13,7 @@ from app.models import User, Download
 from app.services.downloader import (
     get_user_upload_dir,
     extract_audio_from_file,
+    sanitize_filename,
 )
 
 router = APIRouter(prefix="/upload")
@@ -49,7 +50,7 @@ async def upload_and_extract(
             continue
 
         # Save to temp dir with collision-safe name
-        safe_name = f"{uuid4().hex}_{file.filename}"
+        safe_name = f"{uuid4().hex}_{sanitize_filename(Path(file.filename).name)}"
         dest = upload_dir / safe_name
 
         total_size = 0
