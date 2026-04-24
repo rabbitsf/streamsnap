@@ -28,6 +28,9 @@ app/static/css/output.css
 # Skill packages (generated artifacts)
 *.skill
 
+# Docs (local only)
+docs/
+
 # Media files (samples/tests)
 *.mp4
 *.m4a
