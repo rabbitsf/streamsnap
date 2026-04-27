@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
 
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/streamsnap.db")
@@ -28,3 +31,6 @@ SESSION_COOKIE_NAME = "streamsnap_session"
 
 # Registration — set ALLOW_REGISTRATION=true in .env to enable new account creation
 ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "false").lower() == "true"
+
+# Set SECURE_COOKIES=true only when running behind HTTPS (e.g. production)
+SECURE_COOKIES = os.getenv("SECURE_COOKIES", "false").lower() == "true"

@@ -17,6 +17,7 @@ from app.config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     SESSION_COOKIE_NAME,
     ALLOW_REGISTRATION,
+    SECURE_COOKIES,
 )
 from app.database import get_db
 from app.models import User
@@ -45,7 +46,7 @@ def _set_session_cookie(response, token: str):
         key=SESSION_COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=True,
+        secure=SECURE_COOKIES,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
     )
