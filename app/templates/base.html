@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Prevent flash of wrong theme before CSS loads -->
+    <script>(function(){var t=localStorage.getItem('streamsnap-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
     <title>{% block title %}StreamSnap{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,7 +12,7 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* ── Design tokens ───────────────────────────── */
+        /* ── Dark theme tokens (default) ─────────────── */
         :root {
             --bg:         #080808;
             --surf:       #0E0E0E;
@@ -31,6 +33,45 @@
             --red-dim:    rgba(248, 113, 113, 0.12);
             --blue:       #60A5FA;
             --purple:     #C084FC;
+            --dot-color:  rgba(255,255,255,0.022);
+            --nav-bg:     rgba(8,8,8,0.96);
+        }
+
+        /* ── Light theme tokens ──────────────────────── */
+        [data-theme="light"] {
+            --bg:         #F5F1EA;
+            --surf:       #FFFFFF;
+            --surf-2:     #F0EDE7;
+            --surf-3:     #E5E1D8;
+            --border:     #DDD8CF;
+            --border-2:   #CEC9BF;
+            --border-3:   #BDB8AE;
+            --text:       #1A1916;
+            --text-dim:   #3D3A35;
+            --text-muted: #7A7469;
+            --snap:       #B58900;
+            --snap-dim:   #8A6800;
+            --snap-glow:  rgba(181, 137, 0, 0.18);
+            --green:      #15803D;
+            --green-dim:  rgba(21, 128, 61, 0.12);
+            --red:        #DC2626;
+            --red-dim:    rgba(220, 38, 38, 0.10);
+            --blue:       #2563EB;
+            --purple:     #7C3AED;
+            --dot-color:  rgba(0,0,0,0.055);
+            --nav-bg:     rgba(245,241,234,0.96);
+        }
+
+        /* ── Smooth theme transition ─────────────────── */
+        .theme-transitioning,
+        .theme-transitioning *,
+        .theme-transitioning *::before,
+        .theme-transitioning *::after {
+            transition:
+                background-color 0.25s ease,
+                color 0.25s ease,
+                border-color 0.25s ease,
+                box-shadow 0.25s ease !important;
         }
 
         /* ── Reset / base ────────────────────────────── */
@@ -42,7 +83,7 @@
             font-family: 'DM Sans', sans-serif;
             background-image: radial-gradient(
                 circle at 1px 1px,
-                rgba(255,255,255,0.022) 1px,
+                var(--dot-color) 1px,
                 transparent 0
             );
             background-size: 28px 28px;
@@ -103,6 +144,10 @@
             background: #fff060;
             box-shadow: 0 4px 24px rgba(240, 224, 64, 0.22);
         }
+        [data-theme="light"] .btn-primary:hover:not(:disabled) {
+            background: #D4A000;
+            box-shadow: 0 4px 24px rgba(181, 137, 0, 0.30);
+        }
         .btn-primary:active:not(:disabled) { transform: translateY(1px); }
         .btn-primary:disabled {
             background: var(--surf-3);
@@ -125,6 +170,9 @@
             border-radius: 2px;
             cursor: pointer;
             transition: all 0.15s;
+        }
+        [data-theme="light"] .btn-danger {
+            border-color: rgba(220, 38, 38, 0.28);
         }
         .btn-danger:hover:not(:disabled) {
             background: var(--red-dim);
@@ -168,6 +216,9 @@
             border-radius: 2px;
             text-decoration: none;
             transition: all 0.15s;
+        }
+        [data-theme="light"] .btn-dl {
+            border-color: rgba(181, 137, 0, 0.35);
         }
         .btn-dl:hover {
             background: var(--snap-glow);
@@ -219,6 +270,7 @@
         ::-webkit-scrollbar-track { background: var(--surf); }
         ::-webkit-scrollbar-thumb { background: var(--border-3); border-radius: 2px; }
         ::-webkit-scrollbar-thumb:hover { background: #484848; }
+        [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #9A9488; }
 
         .label-tag {
             display: inline-block;
@@ -242,17 +294,36 @@
 <body style="display:flex; flex-direction:column; min-height:100vh;">
 
     <!-- Nav -->
-    <nav style="background:rgba(8,8,8,0.96); border-bottom:1px solid var(--border); backdrop-filter:blur(10px); position:sticky; top:0; z-index:50;">
+    <nav style="background:var(--nav-bg); border-bottom:1px solid var(--border); backdrop-filter:blur(10px); position:sticky; top:0; z-index:50;">
         <div style="max-width:960px; margin:0 auto; padding:0 24px; height:58px; display:flex; align-items:center; justify-content:space-between;">
             <a href="/" style="text-decoration:none; display:flex; align-items:baseline; gap:0; line-height:1;">
                 <span style="font-family:'Bebas Neue',cursive; font-size:1.6rem; color:var(--snap); letter-spacing:0.06em;">STREAM</span><span style="font-family:'Bebas Neue',cursive; font-size:1.6rem; color:var(--text); letter-spacing:0.06em;">SNAP</span>
             </a>
             {% if user %}
-            <div style="display:flex; align-items:center; gap:20px;">
+            <div style="display:flex; align-items:center; gap:16px;">
                 <a href="/history" style="font-size:0.7rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color .15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">History</a>
                 <span style="color:var(--border-2);">·</span>
                 <span style="font-family:'JetBrains Mono',monospace; font-size:0.68rem; color:var(--text-muted); letter-spacing:0.05em;">{{ user.username }}</span>
                 <a href="/logout" style="font-size:0.7rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); text-decoration:none; transition:color .15s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">Logout</a>
+                <button
+                    id="theme-toggle"
+                    onclick="toggleTheme()"
+                    title="Toggle light / dark theme"
+                    style="width:28px; height:28px; border-radius:2px; background:transparent; border:1px solid var(--border-2); color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:0;"
+                    onmouseover="this.style.borderColor='var(--border-3)'; this.style.color='var(--text)'"
+                    onmouseout="this.style.borderColor='var(--border-2)'; this.style.color='var(--text-muted)'"
+                >
+                    <svg id="icon-sun" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                    <svg id="icon-moon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:none;">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
             </div>
             {% endif %}
         </div>
@@ -270,6 +341,36 @@
             <span style="font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text-muted);">1000+ sites · yt-dlp powered</span>
         </div>
     </footer>
+
+    <script>
+    function toggleTheme() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme') || 'light';
+        var next = current === 'dark' ? 'light' : 'dark';
+        html.classList.add('theme-transitioning');
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('streamsnap-theme', next);
+        updateThemeIcons(next);
+        setTimeout(function() { html.classList.remove('theme-transitioning'); }, 300);
+    }
+
+    function updateThemeIcons(theme) {
+        var sun  = document.getElementById('icon-sun');
+        var moon = document.getElementById('icon-moon');
+        if (!sun || !moon) return;
+        if (theme === 'dark') {
+            sun.style.display  = '';
+            moon.style.display = 'none';
+        } else {
+            sun.style.display  = 'none';
+            moon.style.display = '';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateThemeIcons(document.documentElement.getAttribute('data-theme') || 'light');
+    });
+    </script>
 
 </body>
 </html>
