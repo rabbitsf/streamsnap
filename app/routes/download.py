@@ -51,19 +51,27 @@ def _is_safe_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
+            logger.warning("Rejected URL %r: scheme %r not allowed", url, parsed.scheme)
             return False
         hostname = parsed.hostname
         if not hostname:
+            logger.warning("Rejected URL %r: no hostname", url)
             return False
-        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        try:
+            ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        except socket.gaierror as e:
+            logger.warning("Rejected URL %r: DNS lookup for %s failed: %s", url, hostname, e)
+            return False
         for network in _BLOCKED_NETWORKS:
             try:
                 if ip in network:
+                    logger.warning("Rejected URL %r: %s resolves to blocked address %s", url, hostname, ip)
                     return False
             except TypeError:
                 pass
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning("Rejected URL %r: %s", url, e, exc_info=True)
         return False
 
 
