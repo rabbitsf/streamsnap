@@ -37,3 +37,6 @@ docs/
 *.mp3
 *.wav
 *.webm
+
+# AI workflow instructions (local only)
+CLAUDE.md
