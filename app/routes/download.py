@@ -75,6 +75,20 @@ def _is_safe_url(url: str) -> bool:
         return False
 
 
+# Zero-width characters that clipboards can prepend to copied URLs (BOM, ZWSP, ZWNJ, ZWJ, word joiner)
+_INVISIBLE_CHARS = "﻿​‌‍⁠"
+
+
+def _parse_urls(raw: str) -> list[str]:
+    """Split comma/newline-separated URL input, stripping whitespace and invisible characters."""
+    urls = []
+    for line in raw.replace(',', '\n').split('\n'):
+        url = line.strip().strip(_INVISIBLE_CHARS).strip()
+        if url:
+            urls.append(url)
+    return urls
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(
     request: Request,
@@ -94,11 +108,7 @@ async def fetch_formats(
     user: User = Depends(get_current_user),
 ):
     """Fetch available formats for one or more URLs (HTMX endpoint)."""
-    url_list = []
-    for line in urls.replace(',', '\n').split('\n'):
-        url = line.strip()
-        if url:
-            url_list.append(url)
+    url_list = _parse_urls(urls)
 
     if not url_list:
         return templates.TemplateResponse(
@@ -169,7 +179,7 @@ async def start_download(
         )
 
     # Parse URLs
-    url_list = [u.strip() for u in urls.replace(',', '\n').split('\n') if u.strip()]
+    url_list = _parse_urls(urls)
 
     if not url_list:
         return templates.TemplateResponse(
