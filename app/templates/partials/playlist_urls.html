@@ -1,0 +1,22 @@
+<div class="fade-up" style="margin-top:14px;">
+    <p style="font-size:0.8125rem; color:var(--text-dim); margin-bottom:12px;">
+        {% if playlist.title %}<strong style="color:var(--text);">{{ playlist.title }}</strong> · {% endif %}{{ playlist.urls|length }} videos · batches of {{ batch_size }}
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+        {% for batch in playlist.urls|batch(batch_size) %}
+        {% set start = loop.index0 * batch_size + 1 %}
+        <div style="background:var(--surf-2); border:1px solid var(--border-2); border-radius:2px; padding:10px 12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                <span style="font-size:0.68rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">
+                    Batch {{ loop.index }} · videos {{ start }}–{{ start + batch|length - 1 }}
+                </span>
+                <span style="display:flex; gap:6px;">
+                    <button type="button" class="btn-ghost" onclick="copyPlaylistBatch(this)" style="padding:5px 12px; font-size:0.75rem;">Copy</button>
+                    <button type="button" class="btn-ghost" onclick="usePlaylistBatch(this)" style="padding:5px 12px; font-size:0.75rem;">Use ↑</button>
+                </span>
+            </div>
+            <textarea readonly rows="3" class="playlist-batch" style="width:100%; padding:8px 10px; background:var(--surf); border:1px solid var(--border); color:var(--text-dim); border-radius:2px; font-size:0.75rem; font-family:'JetBrains Mono',monospace; resize:vertical; line-height:1.5;">{{ batch|join('\n') }}</textarea>
+        </div>
+        {% endfor %}
+    </div>
+</div>

@@ -66,6 +66,34 @@ https://www.tiktok.com/@user/video/..."
     </div>
 
     <div id="format-options" style="margin-top:4px;"></div>
+
+    <!-- Playlist → URL list (fills the URL box above in batches) -->
+    <details style="margin-top:24px; border-top:1px solid var(--border); padding-top:18px;">
+        <summary style="cursor:pointer; font-size:0.7rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim);">
+            Get URLs from a playlist
+            <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-muted); font-size:0.75rem;">— lists every video so you can download in batches</span>
+        </summary>
+        <form
+            hx-post="/playlist-urls"
+            hx-target="#playlist-result"
+            hx-indicator="#playlist-loading"
+            style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;"
+        >
+            <input
+                type="text"
+                name="playlist_url"
+                required
+                placeholder="https://www.youtube.com/playlist?list=..."
+                style="flex:1; min-width:220px; padding:9px 12px; font-size:0.8125rem; border-radius:2px;"
+            >
+            <button type="submit" class="btn-primary">List Videos</button>
+        </form>
+        <div id="playlist-loading" class="htmx-indicator" style="align-items:center; gap:12px; padding:16px 0;">
+            <div class="spinner"></div>
+            <span style="font-size:0.8125rem; color:var(--text-muted);">Reading playlist…</span>
+        </div>
+        <div id="playlist-result"></div>
+    </details>
 </div>
 
 <!-- ── TAB 2: File Upload ──────────────────────────────── -->
@@ -202,6 +230,28 @@ function switchTab(tab) {
             panel.style.display = 'none';
         }
     });
+}
+
+// ── Playlist batches ────────────────────────────────────
+function copyPlaylistBatch(btn) {
+    const box = btn.closest('div').parentElement.querySelector('.playlist-batch');
+    const done = () => { btn.textContent = 'Copied ✓'; setTimeout(() => btn.textContent = 'Copy', 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(box.value).then(done);
+    } else {
+        box.select();
+        document.execCommand('copy');
+        done();
+    }
+}
+
+function usePlaylistBatch(btn) {
+    const box = btn.closest('div').parentElement.querySelector('.playlist-batch');
+    const urls = document.getElementById('urls');
+    urls.value = box.value;
+    document.getElementById('format-options').innerHTML = '';
+    urls.scrollIntoView({behavior: 'smooth', block: 'center'});
+    urls.focus();
 }
 
 // ── File input ──────────────────────────────────────────

@@ -17,6 +17,7 @@ from app.models import User, Download
 from app.services.downloader import (
     fetch_video_info,
     fetch_multiple_video_info,
+    fetch_playlist_urls,
     download_video,
     extract_audio,
     get_user_base_dir,
@@ -32,6 +33,7 @@ ALLOWED_AUDIO_FORMATS = {"mp3", "m4a", "wav"}
 ALLOWED_AUDIO_QUALITIES = {"128", "192", "320"}
 ALLOWED_QUALITIES = {"best", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p"}
 ALLOWED_DOWNLOAD_TYPES = {"video", "audio"}
+PLAYLIST_BATCH_SIZE = 15  # URLs per copy-able batch in the playlist lister
 _FORMAT_ID_RE = re.compile(r'^[a-zA-Z0-9_\-+/]+$')
 
 # Networks blocked to prevent SSRF
@@ -132,6 +134,49 @@ async def fetch_formats(
             "results": results,
             "single_mode": len(results) == 1,
         }
+    )
+
+
+@router.post("/playlist-urls", response_class=HTMLResponse)
+async def playlist_urls(
+    request: Request,
+    playlist_url: str = Form(...),
+    user: User = Depends(get_current_user),
+):
+    """List every video URL in a playlist so the user can paste them in batches (HTMX endpoint)."""
+    url_list = _parse_urls(playlist_url)
+
+    if len(url_list) != 1:
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Please enter exactly one playlist URL"}
+        )
+
+    url = url_list[0]
+    if not _is_safe_url(url):
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Invalid or disallowed URL"}
+        )
+
+    try:
+        playlist = fetch_playlist_urls(url)
+    except Exception as e:
+        logger.error("Failed to list playlist %s for user %s: %s", url, user.id, e, exc_info=True)
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "Could not read the playlist. Please check the URL."}
+        )
+
+    if not playlist.urls:
+        return templates.TemplateResponse(
+            request, "partials/error.html",
+            {"error": "No videos found — is this a playlist link (with list=...)?"}
+        )
+
+    return templates.TemplateResponse(
+        request, "partials/playlist_urls.html",
+        {"playlist": playlist, "batch_size": PLAYLIST_BATCH_SIZE}
     )
 
 

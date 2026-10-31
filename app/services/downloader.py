@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 _ALLOWED_AUDIO_FORMATS = {"mp3", "m4a", "wav"}
 _ALLOWED_AUDIO_QUALITIES = {"128", "192", "320"}
+PLAYLIST_MAX_ENTRIES = 500  # cap for fetch_playlist_urls so huge playlists can't stall a request
 
 
 @dataclass
@@ -563,3 +564,42 @@ def fetch_multiple_video_info(urls: list[str]) -> list[dict]:
             logger.error("Failed to fetch info for %s: %s", url, e, exc_info=True)
             results.append({"url": url, "info": None, "error": "Could not fetch video info. Please check the URL."})
     return results
+
+
+@dataclass
+class PlaylistInfo:
+    """Video URLs listed in a playlist."""
+    title: Optional[str]
+    urls: list[str]
+
+
+def fetch_playlist_urls(url: str) -> PlaylistInfo:
+    """
+    List the video URLs in a playlist without downloading anything.
+
+    This is the only yt-dlp call that omits 'noplaylist': it uses flat
+    extraction, which reads just the playlist entries (IDs) instead of
+    resolving each video, so large playlists return in seconds.
+    Accepts a playlist URL or a watch URL carrying a '&list=' parameter.
+    """
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': 'in_playlist',
+        'playlistend': PLAYLIST_MAX_ENTRIES,
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    urls = []
+    for entry in info.get('entries') or []:
+        if not entry:
+            continue
+        entry_url = entry.get('url') or entry.get('webpage_url')
+        if entry.get('ie_key') == 'Youtube' and entry.get('id'):
+            entry_url = f"https://www.youtube.com/watch?v={entry['id']}"
+        if entry_url:
+            urls.append(entry_url)
+
+    return PlaylistInfo(title=info.get('title'), urls=urls)
