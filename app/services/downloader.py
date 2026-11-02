@@ -8,10 +8,13 @@ This is the single source of truth for yt-dlp operations.
 import logging
 import os
 import re
+import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 import yt_dlp
 
@@ -22,6 +25,8 @@ logger = logging.getLogger(__name__)
 _ALLOWED_AUDIO_FORMATS = {"mp3", "m4a", "wav"}
 _ALLOWED_AUDIO_QUALITIES = {"128", "192", "320"}
 PLAYLIST_MAX_ENTRIES = 500  # cap for fetch_playlist_urls so huge playlists can't stall a request
+JOB_DIR_NAME = "tmp"  # downloads/{user_id}/tmp/{job_id}/ — per-request scratch space
+STALE_JOB_SECONDS = 6 * 60 * 60  # job dirs older than this are leftovers from crashes/aborts
 
 
 @dataclass
@@ -70,26 +75,77 @@ def sanitize_filename(filename: str) -> str:
     return filename or "download"
 
 
-def get_user_download_dir(user_id: int, media_type: str = None) -> Path:
-    """
-    Get or create the download directory for a user.
-
-    Args:
-        user_id: The user's ID
-        media_type: "video" or "audio" for separate folders, None for base dir
-    """
-    user_dir = DOWNLOADS_DIR / str(user_id)
-    if media_type == "video":
-        user_dir = user_dir / "videos"
-    elif media_type == "audio":
-        user_dir = user_dir / "audios"
-    user_dir.mkdir(parents=True, exist_ok=True)
-    return user_dir
-
-
 def get_user_base_dir(user_id: int) -> Path:
     """Get the base download directory for a user (for security checks)."""
     return DOWNLOADS_DIR / str(user_id)
+
+
+def create_job_dir(user_id: int) -> Path:
+    """
+    Create a fresh, empty scratch directory for one download/extraction request.
+
+    Files are NOT kept on the server: each request builds its output here,
+    streams it to the browser, then calls cleanup_job_dir(). Stale job dirs
+    (crashes, aborted requests) are swept by purge_stale_jobs().
+    """
+    purge_stale_jobs()
+    job_dir = get_user_base_dir(user_id) / JOB_DIR_NAME / uuid4().hex
+    job_dir.mkdir(parents=True)
+    return job_dir
+
+
+def cleanup_job_dir(job_dir: Path, user_id: int) -> None:
+    """Delete a job directory created by create_job_dir (safe to call twice)."""
+    jobs_root = get_user_base_dir(user_id) / JOB_DIR_NAME
+    try:
+        job_dir.resolve().relative_to(jobs_root.resolve())
+    except ValueError:
+        logger.error("Refusing to delete non-job dir %s (user %s)", job_dir, user_id)
+        return
+    shutil.rmtree(job_dir, ignore_errors=True)
+
+
+def purge_stale_jobs(max_age_seconds: int = STALE_JOB_SECONDS) -> int:
+    """Remove job dirs older than max_age_seconds for all users. Returns count removed."""
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for job_dir in DOWNLOADS_DIR.glob(f"*/{JOB_DIR_NAME}/*"):
+        try:
+            if job_dir.is_dir() and job_dir.stat().st_mtime < cutoff:
+                shutil.rmtree(job_dir, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    if removed:
+        logger.info("Purged %d stale download job dir(s)", removed)
+    return removed
+
+
+def _is_within(path: Path, directory: Path) -> bool:
+    try:
+        path.resolve().relative_to(directory.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def resolve_output_name(
+    rename_mode: str,
+    custom_names: Optional[list[str]],
+    batch_prefix: str,
+    index: int,
+) -> Optional[str]:
+    """
+    Canonical rename rule for item `index` (0-based) of a batch.
+
+    Returns the requested output name (no extension), or None to keep the original.
+    """
+    names = custom_names or []
+    if rename_mode == "individual" and index < len(names) and names[index].strip():
+        return names[index].strip()
+    if rename_mode == "batch" and batch_prefix.strip():
+        return f"{batch_prefix.strip()} {index + 1:02d}"
+    return None
 
 
 def fetch_video_info(url: str) -> VideoInfo:
@@ -178,6 +234,7 @@ def fetch_video_info(url: str) -> VideoInfo:
 def download_video(
     url: str,
     user_id: int,
+    job_dir: Path,
     quality: str = "best",
     format_id: Optional[str] = None,
 ) -> DownloadResult:
@@ -189,11 +246,11 @@ def download_video(
 
     Args:
         url: The video URL
-        user_id: The user's ID (for directory isolation)
+        user_id: The user's ID (for logging)
+        job_dir: Scratch dir from create_job_dir(); the file is written here
         quality: Quality preference ("best", "1080p", "720p", etc.)
         format_id: Specific format ID to download
     """
-    user_dir = get_user_download_dir(user_id, media_type="video")
 
     # Build format selector
     if format_id:
@@ -207,7 +264,7 @@ def download_video(
 
     ydl_opts = {
         'format': format_selector,
-        'outtmpl': str(user_dir / '%(title)s.%(ext)s'),
+        'outtmpl': str(job_dir / '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
@@ -225,13 +282,13 @@ def download_video(
                 # Fallback
                 title = sanitize_filename(info.get('title', 'video'))
                 ext = info.get('ext', 'mp4')
-                filepath = str(user_dir / f"{title}.{ext}")
+                filepath = str(job_dir / f"{title}.{ext}")
 
             file_path = Path(filepath)
 
             # Security: verify yt-dlp wrote within user's directory
             try:
-                file_path.resolve().relative_to(user_dir.resolve())
+                file_path.resolve().relative_to(job_dir.resolve())
             except ValueError:
                 logger.error("yt-dlp wrote file outside user dir: %s (user %s)", filepath, user_id)
                 return DownloadResult(
@@ -264,6 +321,7 @@ def download_video(
 def extract_audio(
     url: str,
     user_id: int,
+    job_dir: Path,
     audio_format: str = "mp3",
     audio_quality: str = "192",
 ) -> DownloadResult:
@@ -275,7 +333,8 @@ def extract_audio(
 
     Args:
         url: The video URL
-        user_id: The user's ID (for directory isolation)
+        user_id: The user's ID (for logging)
+        job_dir: Scratch dir from create_job_dir(); the file is written here
         audio_format: Output format ("mp3", "m4a", "wav", etc.)
         audio_quality: Bitrate in kbps ("128", "192", "320")
     """
@@ -290,11 +349,10 @@ def extract_audio(
             title=None, file_size=None, error=f"Unsupported audio quality: {audio_quality}",
         )
 
-    user_dir = get_user_download_dir(user_id, media_type="audio")
 
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': str(user_dir / '%(title)s.%(ext)s'),
+        'outtmpl': str(job_dir / '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
@@ -315,17 +373,17 @@ def extract_audio(
             else:
                 # Fallback: construct path and search
                 title = sanitize_filename(info.get('title', 'audio'))
-                filepath = user_dir / f"{title}.{audio_format}"
+                filepath = job_dir / f"{title}.{audio_format}"
 
                 if not filepath.exists():
-                    for f in user_dir.iterdir():
+                    for f in job_dir.iterdir():
                         if f.suffix == f".{audio_format}" and f.stem.startswith(title[:20]):
                             filepath = f
                             break
 
             # Security: verify yt-dlp wrote within user's directory
             try:
-                filepath.resolve().relative_to(user_dir.resolve())
+                filepath.resolve().relative_to(job_dir.resolve())
             except ValueError:
                 logger.error("yt-dlp wrote audio outside user dir: %s (user %s)", filepath, user_id)
                 return DownloadResult(
@@ -381,16 +439,10 @@ def delete_download(file_path: str, user_id: int) -> bool:
     return False
 
 
-def get_user_upload_dir(user_id: int) -> Path:
-    """Get or create the upload directory for temporary file uploads."""
-    upload_dir = DOWNLOADS_DIR / str(user_id) / "uploads"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    return upload_dir
-
-
 def extract_audio_from_file(
     source_path: str,
     user_id: int,
+    job_dir: Path,
     audio_format: str = "mp3",
     audio_quality: str = "192",
     output_filename: Optional[str] = None,
@@ -403,7 +455,8 @@ def extract_audio_from_file(
 
     Args:
         source_path: Path to the source video file
-        user_id: The user's ID (for directory isolation)
+        user_id: The user's ID (for logging)
+        job_dir: Scratch dir from create_job_dir(); source must be inside it, output is written there
         audio_format: Output format ("mp3", "m4a", "wav")
         audio_quality: Bitrate in kbps ("128", "192", "320")
         output_filename: Custom output name (without extension); uses source stem if None
@@ -422,17 +475,13 @@ def extract_audio_from_file(
             title=None, file_size=None, error="Source file not found",
         )
 
-    # Security: verify source is in user's directory
-    user_base = get_user_base_dir(user_id)
-    try:
-        source.resolve().relative_to(user_base.resolve())
-    except ValueError:
+    # Security: verify source is in this request's job directory
+    if not _is_within(source, job_dir):
         return DownloadResult(
             success=False, file_path=None, filename=None,
             title=None, file_size=None, error="Access denied",
         )
 
-    output_dir = get_user_download_dir(user_id, media_type="audio")
 
     # Determine output filename
     if output_filename:
@@ -446,12 +495,12 @@ def extract_audio_from_file(
         else:
             stem = sanitize_filename(original_stem)
 
-    output_path = output_dir / f"{stem}.{audio_format}"
+    output_path = job_dir / f"{stem}.{audio_format}"
 
     # Handle collision
     counter = 1
     while output_path.exists():
-        output_path = output_dir / f"{stem}_{counter}.{audio_format}"
+        output_path = job_dir / f"{stem}_{counter}.{audio_format}"
         counter += 1
 
     # Codec mapping

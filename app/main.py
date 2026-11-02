@@ -8,6 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.database import init_db
 from app.routes import auth, download, history, upload
+from app.services.downloader import purge_stale_jobs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,8 +46,9 @@ app.include_router(upload.router)
 
 @app.on_event("startup")
 async def startup():
-    """Initialize database on startup."""
+    """Initialize database on startup and sweep leftover download job dirs."""
     init_db()
+    purge_stale_jobs()
 
 
 @app.exception_handler(HTTPException)

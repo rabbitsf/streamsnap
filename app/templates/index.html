@@ -51,7 +51,7 @@
                 placeholder="https://www.youtube.com/watch?v=...
 https://twitter.com/user/status/...
 https://www.tiktok.com/@user/video/..."
-            ></textarea>
+            >{{ prefill_url or '' }}</textarea>
         </div>
         <button type="submit" class="btn-primary">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -100,10 +100,7 @@ https://www.tiktok.com/@user/video/..."
 <div id="panel-upload" style="background:var(--surf); border:1px solid var(--border); border-top:none; padding:28px; display:none;">
     <form
         id="upload-form"
-        hx-post="/upload/extract"
-        hx-target="#upload-result"
-        hx-indicator="#upload-loading"
-        hx-encoding="multipart/form-data"
+        onsubmit="event.preventDefault(); StreamSnapSave.startUploadExtract(this);"
     >
         <!-- Drop zone -->
         <div
@@ -202,12 +199,6 @@ https://www.tiktok.com/@user/video/..."
         </button>
     </form>
 
-    <!-- Upload loading -->
-    <div id="upload-loading" class="htmx-indicator" style="align-items:center; justify-content:center; gap:12px; padding:32px 0;">
-        <div class="spinner"></div>
-        <span style="font-size:0.8125rem; color:var(--text-muted);">Uploading and extracting audio… this may take a moment</span>
-    </div>
-
     <div id="upload-result" style="margin-top:4px;"></div>
 </div>
 
@@ -216,6 +207,7 @@ https://www.tiktok.com/@user/video/..."
     YouTube · Twitter/X · TikTok · Instagram · Vimeo · Twitch · Reddit · and many more
 </p>
 
+<script src="/static/js/save.js"></script>
 <script>
 function switchTab(tab) {
     const tabs = ['url', 'upload'];

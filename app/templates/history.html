@@ -34,7 +34,7 @@
     </form>
     <button
         hx-post="/history/delete-all"
-        hx-confirm="Delete ALL downloads? This cannot be undone."
+        hx-confirm="Clear ALL history entries? This cannot be undone."
         hx-swap="none"
         class="btn-ghost"
     >
@@ -110,23 +110,21 @@
                 </td>
                 <td style="padding:12px 14px; text-align:right;">
                     <div style="display:flex; justify-content:flex-end; align-items:center; gap:6px;">
-                        {% if download.file_exists %}
+                        {% if download.url and download.url.startswith('http') %}
                         <a
-                            href="/file/{{ download.id }}"
+                            href="/?url={{ download.url | urlencode }}"
                             class="btn-dl"
-                            download
+                            title="Fetch this video again from its source"
                         >
                             <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Save
+                            Again
                         </a>
-                        {% else %}
-                        <span style="font-size:0.7rem; color:var(--text-muted); font-style:italic;">deleted</span>
                         {% endif %}
                         <button
                             hx-delete="/history/{{ download.id }}"
                             hx-target="#row-{{ download.id }}"
                             hx-swap="outerHTML"
-                            hx-confirm="Delete this download?"
+                            hx-confirm="Remove this entry from history?"
                             class="btn-danger"
                             style="padding:5px 10px;"
                         >

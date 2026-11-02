@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, Depends, Request, HTTPException, Form
@@ -26,10 +25,6 @@ async def history_page(
         Download.user_id == user.id
     ).order_by(Download.created_at.desc()).all()
 
-    # Check which files still exist
-    for download in downloads:
-        download.file_exists = Path(download.file_path).exists()
-
     return templates.TemplateResponse(
         request, "history.html",
         {
@@ -55,8 +50,9 @@ async def delete_history_item(
     if not download:
         raise HTTPException(status_code=404, detail="Download not found")
 
-    # Delete the file
-    delete_download(download.file_path, user.id)
+    # History is a log; rows made before direct-to-browser saving may still point at a server file
+    if download.file_path:
+        delete_download(download.file_path, user.id)
 
     # Delete the database record
     db.delete(download)
@@ -83,7 +79,8 @@ async def delete_bulk_history(
     ).all()
 
     for download in downloads:
-        delete_download(download.file_path, user.id)
+        if download.file_path:
+            delete_download(download.file_path, user.id)
         db.delete(download)
 
     db.commit()
@@ -104,7 +101,8 @@ async def delete_all_history(
     ).all()
 
     for download in downloads:
-        delete_download(download.file_path, user.id)
+        if download.file_path:
+            delete_download(download.file_path, user.id)
         db.delete(download)
 
     db.commit()

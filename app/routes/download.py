@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Request, Form
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -20,8 +22,10 @@ from app.services.downloader import (
     fetch_playlist_urls,
     download_video,
     extract_audio,
-    get_user_base_dir,
+    create_job_dir,
+    cleanup_job_dir,
     rename_download_file,
+    resolve_output_name,
 )
 
 router = APIRouter()
@@ -94,12 +98,13 @@ def _parse_urls(raw: str) -> list[str]:
 @router.get("/", response_class=HTMLResponse)
 async def index(
     request: Request,
+    url: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
-    """Main download page."""
+    """Main download page. `?url=` prefills the URL box (History → "Again")."""
     return templates.TemplateResponse(
         request, "index.html",
-        {"user": user}
+        {"user": user, "prefill_url": url}
     )
 
 
@@ -180,10 +185,29 @@ async def playlist_urls(
     )
 
 
-@router.post("/download", response_class=HTMLResponse)
+def _json_error(message: str, status_code: int = 400) -> JSONResponse:
+    """Error body for the fetch()-driven save endpoints (read by static/js/save.js)."""
+    return JSONResponse({"error": message}, status_code=status_code)
+
+
+def stream_and_cleanup(file_path: str, filename: str, job_dir: Path, user_id: int) -> FileResponse:
+    """
+    Canonical way to hand a finished file to the browser without keeping it:
+    stream it as an attachment, then delete the request's job dir.
+    Used by /download and /upload/extract.
+    """
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/octet-stream",
+        background=BackgroundTask(cleanup_job_dir, job_dir, user_id),
+    )
+
+
+@router.post("/download")
 async def start_download(
-    request: Request,
     urls: str = Form(...),
+    item_index: int = Form(0),
     download_type: str = Form(...),
     quality: str = Form("best"),
     format_id: Optional[str] = Form(None),
@@ -195,158 +219,82 @@ async def start_download(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Start downloads for one or more URLs (HTMX endpoint)."""
+    """
+    Download ONE item of a batch and stream it to the browser (no copy kept on the server).
+
+    The browser (static/js/save.js) calls this once per URL with `item_index`,
+    sending the whole form each time so rename rules resolve server-side.
+    """
     # Validate enumerated inputs
     if download_type not in ALLOWED_DOWNLOAD_TYPES:
-        return templates.TemplateResponse(
-            request, "partials/error.html",
-            {"error": "Invalid download type"}
-        )
+        return _json_error("Invalid download type")
     if audio_format not in ALLOWED_AUDIO_FORMATS:
-        return templates.TemplateResponse(
-            request, "partials/error.html",
-            {"error": "Invalid audio format"}
-        )
+        return _json_error("Invalid audio format")
     if audio_quality not in ALLOWED_AUDIO_QUALITIES:
-        return templates.TemplateResponse(
-            request, "partials/error.html",
-            {"error": "Invalid audio quality"}
-        )
+        return _json_error("Invalid audio quality")
     if quality not in ALLOWED_QUALITIES:
-        return templates.TemplateResponse(
-            request, "partials/error.html",
-            {"error": "Invalid quality selection"}
-        )
+        return _json_error("Invalid quality selection")
     if format_id and not _FORMAT_ID_RE.match(format_id):
-        return templates.TemplateResponse(
-            request, "partials/error.html",
-            {"error": "Invalid format ID"}
-        )
+        return _json_error("Invalid format ID")
 
-    # Parse URLs
     url_list = _parse_urls(urls)
-
     if not url_list:
-        return templates.TemplateResponse(
-            request, "partials/error.html",
-            {"error": "No URLs provided"}
-        )
+        return _json_error("No URLs provided")
+    if not 0 <= item_index < len(url_list):
+        return _json_error("Invalid item index")
 
-    # SSRF protection
-    for url in url_list:
-        if not _is_safe_url(url):
-            return templates.TemplateResponse(
-                request, "partials/error.html",
-                {"error": "Invalid or disallowed URL"}
-            )
+    url = url_list[item_index]
+    if not _is_safe_url(url):
+        return _json_error("Invalid or disallowed URL")
 
-    name_list = [n.strip() for n in (custom_names or []) if n.strip()]
-
-    download_records = []
-    errors = []
-
-    for idx, url in enumerate(url_list):
-        try:
-            if download_type == "audio":
-                result = extract_audio(
-                    url=url,
-                    user_id=user.id,
-                    audio_format=audio_format,
-                    audio_quality=audio_quality,
-                )
-                format_type = "audio"
-                quality_label = audio_format.upper()
-            else:
-                result = download_video(
-                    url=url,
-                    user_id=user.id,
-                    quality=quality,
-                    format_id=format_id if format_id else None,
-                )
-                format_type = "video"
-                quality_label = quality
-
-            if not result.success:
-                errors.append({"url": url, "error": result.error or "Download failed"})
-                continue
-
-            # Apply rename if requested
-            final_path = result.file_path
-            final_filename = result.filename
-            final_title = result.title
-
-            if rename_mode == "individual" and idx < len(name_list) and name_list[idx]:
-                new_path = rename_download_file(result.file_path, name_list[idx], user.id)
-                if new_path:
-                    final_path = new_path
-                    final_filename = Path(new_path).name
-                    final_title = name_list[idx]
-            elif rename_mode == "batch" and batch_prefix:
-                new_name = f"{batch_prefix} {idx + 1:02d}"
-                new_path = rename_download_file(result.file_path, new_name, user.id)
-                if new_path:
-                    final_path = new_path
-                    final_filename = Path(new_path).name
-                    final_title = new_name
-
-            # Save to history
-            download_record = Download(
-                user_id=user.id,
-                url=url,
-                title=final_title,
-                filename=final_filename,
-                file_path=final_path,
-                file_size=result.file_size,
-                format_type=format_type,
-                quality=quality_label,
-            )
-            db.add(download_record)
-            db.commit()
-            db.refresh(download_record)
-            download_records.append(download_record)
-
-        except Exception as e:
-            logger.error("Unexpected error downloading %s for user %s: %s", url, user.id, e, exc_info=True)
-            errors.append({"url": url, "error": "An unexpected error occurred. Please try again."})
-
-    return templates.TemplateResponse(
-        request, "partials/download_complete.html",
-        {
-            "downloads": download_records,
-            "errors": errors,
-            "single_mode": len(url_list) == 1,
-        }
-    )
-
-
-@router.get("/file/{download_id}")
-async def serve_file(
-    download_id: int,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Serve a downloaded file to the user."""
-    download = db.query(Download).filter(
-        Download.id == download_id,
-        Download.user_id == user.id,
-    ).first()
-
-    if not download:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    file_path = Path(download.file_path)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File no longer exists")
-
-    # Verify file is in user's directory (security check)
-    user_base_dir = get_user_base_dir(user.id)
+    job_dir = create_job_dir(user.id)
     try:
-        file_path.resolve().relative_to(user_base_dir.resolve())
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Access denied")
+        if download_type == "audio":
+            result = await run_in_threadpool(
+                extract_audio,
+                url=url, user_id=user.id, job_dir=job_dir,
+                audio_format=audio_format, audio_quality=audio_quality,
+            )
+            format_type = "audio"
+            quality_label = audio_format.upper()
+        else:
+            result = await run_in_threadpool(
+                download_video,
+                url=url, user_id=user.id, job_dir=job_dir,
+                quality=quality, format_id=format_id or None,
+            )
+            format_type = "video"
+            quality_label = quality
 
-    return FileResponse(
-        path=file_path,
-        filename=download.filename,
-        media_type="application/octet-stream",
-    )
+        if not result.success or not result.file_path or not Path(result.file_path).exists():
+            cleanup_job_dir(job_dir, user.id)
+            return _json_error(result.error or "Download failed", status_code=502)
+
+        final_path = result.file_path
+        final_title = result.title
+        new_name = resolve_output_name(rename_mode, custom_names, batch_prefix, item_index)
+        if new_name:
+            renamed = rename_download_file(result.file_path, new_name, user.id)
+            if renamed:
+                final_path = renamed
+                final_title = new_name
+        final_filename = Path(final_path).name
+
+        # History is a log only — the file itself is not kept on the server
+        db.add(Download(
+            user_id=user.id,
+            url=url,
+            title=final_title,
+            filename=final_filename,
+            file_path="",
+            file_size=result.file_size,
+            format_type=format_type,
+            quality=quality_label,
+        ))
+        db.commit()
+    except Exception as e:
+        cleanup_job_dir(job_dir, user.id)
+        logger.error("Unexpected error downloading %s for user %s: %s", url, user.id, e, exc_info=True)
+        return _json_error("An unexpected error occurred. Please try again.", status_code=500)
+
+    return stream_and_cleanup(final_path, final_filename, job_dir, user.id)
